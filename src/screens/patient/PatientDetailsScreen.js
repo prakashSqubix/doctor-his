@@ -4,38 +4,36 @@ import {
   Text, 
   ScrollView, 
   TouchableOpacity, 
-  Image, 
-  StyleSheet 
+  StyleSheet,
+  StatusBar
 } from 'react-native';
 
-// Navigation/Router logic commented out
-// import { useRouter } from 'expo-router'; 
-
 // Import your theme file
-import { colors, spacing, typography, radius, shadows } from '../../Constants/theme';
+import { colors, spacing, radius, shadows } from '../../Constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// Icons commented out
-/* import { 
+// Icons
+import { 
   Phone, 
   Calendar, 
   MapPin, 
-  Heart, 
   Pill, 
   AlertTriangle, 
   FileText, 
   Plus, 
   ChevronRight,
   Clock,
-  User
+  User,
+  Activity,
+  MoreVertical,
+  ArrowRight
 } from 'lucide-react-native';
-*/
 
 const PatientDetailsScreen = () => {
-  // const router = useRouter(); // Router commented out
   const [activeTab, setActiveTab] = useState('overview');
- const inset = useSafeAreaInsets()
-  // Mock patient data
+  const insets = useSafeAreaInsets();
+
+  // --- MOCK DATA (Unchanged) ---
   const patientData = {
     id: 'PT-12345',
     name: 'Sarah Johnson',
@@ -50,7 +48,6 @@ const PatientDetailsScreen = () => {
     }
   };
 
-  // Mock medical history
   const medicalHistory = [
     { id: 1, condition: 'Hypertension', diagnosed: '2019', status: 'Managed' },
     { id: 2, condition: 'Seasonal Allergies', diagnosed: '2015', status: 'Active' },
@@ -58,21 +55,18 @@ const PatientDetailsScreen = () => {
     { id: 4, condition: 'Asthma', diagnosed: '2010', status: 'Inactive' }
   ];
 
-  // Mock current medications
   const medications = [
     { id: 1, name: 'Lisinopril', dosage: '10mg', frequency: 'Once daily', prescribed: 'Dr. Williams' },
     { id: 2, name: 'Metformin', dosage: '500mg', frequency: 'Twice daily', prescribed: 'Dr. Williams' },
     { id: 3, name: 'Albuterol Inhaler', dosage: '2 puffs', frequency: 'As needed', prescribed: 'Dr. Williams' }
   ];
 
-  // Mock allergies
   const allergies = [
     { id: 1, allergen: 'Penicillin', reaction: 'Skin rash', severity: 'Moderate' },
     { id: 2, allergen: 'Shellfish', reaction: 'Anaphylaxis', severity: 'Severe' },
     { id: 3, allergen: 'Latex', reaction: 'Skin irritation', severity: 'Mild' }
   ];
 
-  // Mock appointment history
   const appointmentHistory = [
     { id: 1, date: '2023-05-15', time: '10:30 AM', reason: 'Annual Physical', doctor: 'Dr. Williams', status: 'Completed' },
     { id: 2, date: '2023-03-22', time: '2:15 PM', reason: 'Follow-up Visit', doctor: 'Dr. Williams', status: 'Completed' },
@@ -80,792 +74,667 @@ const PatientDetailsScreen = () => {
     { id: 4, date: '2022-11-05', time: '9:45 AM', reason: 'Flu Shot', doctor: 'Dr. Peterson', status: 'Completed' }
   ];
 
-  const getStatusStyle = (status) => {
+  // --- HELPER FUNCTIONS ---
+  const getStatusColor = (status) => {
     switch (status) {
-      case 'Active':
-        return styles.statusChipActive;
-      case 'Managed':
-        return styles.statusChipManaged;
-      default:
-        return styles.statusChipInactive;
+      case 'Active': return { bg: '#FEF2F2', text: '#DC2626' }; // Red
+      case 'Managed': return { bg: '#ECFDF5', text: '#059669' }; // Green
+      default: return { bg: '#F3F4F6', text: '#4B5563' }; // Gray
     }
   };
 
-  const getStatusTextStyle = (status) => {
-    switch (status) {
-      case 'Active':
-        return styles.statusTextActive;
-      case 'Managed':
-        return styles.statusTextManaged;
-      default:
-        return styles.statusTextInactive;
-    }
-  };
-
-  const getAllergySeverityStyle = (severity) => {
+  const getAllergyColor = (severity) => {
     switch (severity) {
-      case 'Severe':
-        return styles.severityChipSevere;
-      case 'Moderate':
-        return styles.severityChipModerate;
-      case 'Mild':
-        return styles.severityChipMild;
-      default:
-        return styles.statusChipInactive;
+      case 'Severe': return { bg: '#FEF2F2', text: '#DC2626', border: '#FECACA' };
+      case 'Moderate': return { bg: '#FFF7ED', text: '#EA580C', border: '#FED7AA' };
+      default: return { bg: '#FEFCE8', text: '#CA8A04', border: '#FEF08A' };
     }
   };
 
-  const getAllergySeverityTextStyle = (severity) => {
-    switch (severity) {
-      case 'Severe':
-        return styles.severityTextSevere;
-      case 'Moderate':
-        return styles.severityTextModerate;
-      case 'Mild':
-        return styles.severityTextMild;
-      default:
-        return styles.statusTextInactive;
-    }
-  };
-
+  // --- RENDER ---
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={[styles.header,{paddingTop:inset.top +20}]}>
-        <View style={styles.headerTopRow}>
-          <TouchableOpacity onPress={() => {/* router.back() */}}>
-            {/* <ChevronRight size={28} color="white" style={styles.backIcon} /> */}
+      <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
+      
+      {/* 1. Immersive Header Section */}
+      <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
+        <View style={styles.headerNav}>
+          <TouchableOpacity style={styles.navButton}>
+            <ChevronRight size={24} color="white" style={{transform: [{rotate: '180deg'}]}} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Patient Details</Text>
-          <View style={styles.headerSpacer} /> {/* Spacer for alignment */}
+          <Text style={styles.headerTitle}>Patient Profile</Text>
+          <TouchableOpacity style={styles.navButton}>
+            <MoreVertical size={24} color="white" />
+          </TouchableOpacity>
         </View>
-        
-        {/* Patient Info Card */}
-        <View style={[styles.patientInfoCard, shadows.md]}>
-          <View style={styles.patientInfoRow}>
-            <View style={styles.avatarPlaceholder} />
-            <View style={styles.patientDetails}>
-              <Text style={styles.patientName}>{patientData.name}</Text>
-              <Text style={styles.patientMeta}>{patientData.age} years, {patientData.gender}</Text>
+
+        {/* Floating Profile Card */}
+        <View style={styles.profileCard}>
+          <View style={styles.profileHeader}>
+            <View style={styles.avatarContainer}>
+              <Text style={styles.avatarText}>{patientData.name.charAt(0)}</Text>
+            </View>
+            <View style={styles.profileInfo}>
+              <Text style={styles.profileName}>{patientData.name}</Text>
+              <Text style={styles.profileMeta}>
+                {patientData.id} • {patientData.age} Yrs • {patientData.gender}
+              </Text>
             </View>
           </View>
           
-          <View style={styles.contactRow}>
-            <View style={styles.contactItem}>
-              {/* <Phone size={16} color={colors.gray600} /> */}
-              <Text style={styles.contactText}>{patientData.phone}</Text>
-            </View>
-            <View style={styles.contactItem}>
-              {/* <MapPin size={16} color={colors.gray600} /> */}
-              <Text style={styles.contactText}>NYC General Hospital</Text>
-            </View>
+          <View style={styles.profileDivider} />
+          
+          <View style={styles.contactGrid}>
+            <TouchableOpacity style={styles.contactItem}>
+              <View style={[styles.iconCircle, { backgroundColor: '#EEF2FF' }]}>
+                <Phone size={16} color={colors.primary} />
+              </View>
+              <Text style={styles.contactLabel}>Call</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.contactItem}>
+              <View style={[styles.iconCircle, { backgroundColor: '#ECFDF5' }]}>
+                <MapPin size={16} color={colors.success} />
+              </View>
+              <Text style={styles.contactLabel}>Locate</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.contactItem}>
+              <View style={[styles.iconCircle, { backgroundColor: '#FEF2F2' }]}>
+                <AlertTriangle size={16} color={colors.error} />
+              </View>
+              <Text style={styles.contactLabel}>Alert</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
-      
-      {/* Quick Actions */}
-      <View style={[styles.quickActionsContainer, shadows.md]}>
-        <TouchableOpacity 
-          style={styles.actionButton}
-          onPress={() => {/* router.push('/emr-generation') */}}
-        >
-          <View style={[styles.actionIconWrapper, styles.actionNewEMR]}>
-            {/* <FileText size={24} color={colors.primary} /> */}
-          </View>
-          <Text style={styles.actionText}>New EMR</Text>
-        </TouchableOpacity>
+
+      {/* 2. Main Content Area */}
+      <View style={styles.contentContainer}>
         
-        <TouchableOpacity 
-          style={styles.actionButton}
-          onPress={() => {/* router.push('/prescription-generation') */}}
-        >
-          <View style={[styles.actionIconWrapper, styles.actionPrescription]}>
-            {/* <Pill size={24} color={colors.success} /> */}
-          </View>
-          <Text style={styles.actionText}>Prescription</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.actionButton}>
-          <View style={[styles.actionIconWrapper, styles.actionSchedule]}>
-            {/* <Calendar size={24} color={colors.purple} /> */}
-          </View>
-          <Text style={styles.actionText}>Schedule</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.actionButton}>
-          <View style={[styles.actionIconWrapper, styles.actionContact]}>
-            {/* <Phone size={24} color={colors.warning} /> */}
-          </View>
-          <Text style={styles.actionText}>Contact</Text>
-        </TouchableOpacity>
-      </View>
-      
-      {/* Tabs */}
-      <View style={[styles.tabContainer, shadows.sm]}>
-        {['overview', 'history', 'medications', 'allergies'].map((tab) => (
-          <TouchableOpacity 
-            key={tab}
-            style={[
-              styles.tabButton,
-              activeTab === tab && styles.tabButtonActive,
-            ]}
-            onPress={() => setActiveTab(tab)}
-          >
-            <Text style={[
-              styles.tabText,
-              activeTab === tab ? styles.tabTextActive : styles.tabTextInactive
-            ]}>
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
-            </Text>
+        {/* Quick Action Strip */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickActionsScroll}>
+          <TouchableOpacity style={styles.quickActionBtn}>
+             <FileText size={20} color={colors.primary} />
+             <Text style={styles.quickActionText}>New EMR</Text>
           </TouchableOpacity>
-        ))}
-      </View>
-      
-      {/* Content */}
-      <ScrollView style={styles.contentScroll}>
-        {/* Overview Tab */}
-        {activeTab === 'overview' && (
-          <View>
-            {/* Personal Information */}
-            <View style={[styles.card, shadows.sm]}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardTitle}>Personal Information</Text>
-                <TouchableOpacity>
-                  <Text style={styles.editText}>Edit</Text>
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.detailGroup}>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Patient ID:</Text>
-                  <Text style={styles.detailValue}>{patientData.id}</Text>
-                </View>
-                
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Address:</Text>
-                  <Text style={styles.detailValue}>{patientData.address}</Text>
-                </View>
-                
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Emergency:</Text>
-                  <View style={styles.detailValue}>
-                    <Text style={styles.detailValueBold}>{patientData.emergencyContact.name}</Text>
-                    <Text style={styles.detailMeta}>{patientData.emergencyContact.relationship} • {patientData.emergencyContact.phone}</Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-            
-            {/* Upcoming Appointments */}
-            <View style={[styles.card, shadows.sm]}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardTitle}>Upcoming Appointments</Text>
-                <TouchableOpacity>
-                  <Text style={styles.editText}>View All</Text>
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.upcomingAppointment}>
-                <View style={styles.appointmentDateRow}>
-                  <View style={styles.appointmentMarker} />
-                  {/* <Calendar size={12} color="white" style={styles.appointmentIcon} /> */}
-                  <Text style={styles.appointmentDateText}>June 15, 2023</Text>
-                </View>
-                <Text style={styles.appointmentReason}>Annual Physical Checkup</Text>
-                <Text style={styles.appointmentMeta}>Dr. Williams • 10:30 AM</Text>
-              </View>
-            </View>
-            
-            {/* Recent Activity */}
-            <View style={[styles.card, shadows.sm]}>
-              <Text style={styles.cardTitle}>Recent Activity</Text>
-              
-              <View style={styles.activityGroup}>
-                <View style={styles.activityRow}>
-                  <View style={[styles.activityIconWrapper, styles.activityEMR]}>
-                    {/* <FileText size={16} color={colors.successDark} /> */}
-                  </View>
-                  <View>
-                    <Text style={styles.activityTitle}>New EMR Created</Text>
-                    <Text style={styles.activityMeta}>June 5, 2023 • Dr. Williams</Text>
-                  </View>
-                </View>
-                
-                <View style={styles.activityRow}>
-                  <View style={[styles.activityIconWrapper, styles.activityPrescription]}>
-                    {/* <Pill size={16} color={colors.primary} /> */}
-                  </View>
-                  <View>
-                    <Text style={styles.activityTitle}>Prescription Renewed</Text>
-                    <Text style={styles.activityMeta}>May 28, 2023 • Metformin</Text>
-                  </View>
-                </View>
-                
-                <View style={styles.activityRow}>
-                  <View style={[styles.activityIconWrapper, styles.activitySchedule]}>
-                    {/* <Calendar size={16} color={colors.purple} /> */}
-                  </View>
-                  <View>
-                    <Text style={styles.activityTitle}>Appointment Scheduled</Text>
-                    <Text style={styles.activityMeta}>May 20, 2023 • Annual Physical</Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-          </View>
-        )}
-        
-        {/* Medical History Tab */}
-        {activeTab === 'history' && (
-          <View>
-            <View style={[styles.listCard, shadows.sm]}>
-              <View style={styles.listHeader}>
-                <Text style={styles.cardTitle}>Medical History</Text>
-                <Text style={styles.listSubTitle}>Conditions and diagnoses</Text>
-              </View>
-              
-              <View style={styles.listContent}>
-                {medicalHistory.map((condition, index) => (
-                  <View 
-                    key={condition.id} 
-                    style={[styles.listItem, index < medicalHistory.length - 1 && styles.listItemDivider]}
-                  >
-                    <View style={styles.listItemRow}>
-                      <Text style={styles.listItemTitle}>{condition.condition}</Text>
-                      <View style={[styles.statusChip, getStatusStyle(condition.status)]}>
-                        <Text style={[styles.statusChipText, getStatusTextStyle(condition.status)]}>
-                          {condition.status}
-                        </Text>
-                      </View>
-                    </View>
-                    <Text style={styles.listItemMeta}>Diagnosed: {condition.diagnosed}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-            
-            <View style={[styles.listCard, shadows.sm, styles.marginTopMd]}>
-              <View style={styles.listHeader}>
-                <Text style={styles.cardTitle}>Appointment History</Text>
-                <Text style={styles.listSubTitle}>Past visits and consultations</Text>
-              </View>
-              
-              <View style={styles.listContent}>
-                {appointmentHistory.map((appointment, index) => (
-                  <View 
-                    key={appointment.id} 
-                    style={[styles.listItem, index < appointmentHistory.length - 1 && styles.listItemDivider]}
-                  >
-                    <View style={styles.listItemRow}>
-                      <Text style={styles.listItemTitle}>{appointment.reason}</Text>
-                      <Text style={styles.listItemMeta}>{appointment.date}</Text>
-                    </View>
-                    <View style={styles.appointmentDetailRow}>
-                      {/* <Clock size={14} color={colors.gray600} style={styles.detailIcon} /> */}
-                      <Text style={styles.listItemText}>{appointment.time}</Text>
-                      {/* <User size={14} color={colors.gray600} style={styles.detailIcon} /> */}
-                      <Text style={styles.listItemText}>{appointment.doctor}</Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            </View>
-          </View>
-        )}
-        
-        {/* Medications Tab */}
-        {activeTab === 'medications' && (
-          <View>
-            <View style={[styles.listCard, shadows.sm]}>
-              <View style={styles.listHeader}>
-                <Text style={styles.cardTitle}>Current Medications</Text>
-                <Text style={styles.listSubTitle}>Active prescriptions</Text>
-              </View>
-              
-              <View style={styles.listContent}>
-                {medications.map((med, index) => (
-                  <View 
-                    key={med.id} 
-                    style={[styles.listItem, index < medications.length - 1 && styles.listItemDivider]}
-                  >
-                    <Text style={styles.listItemTitle}>{med.name}</Text>
-                    <Text style={styles.listItemMeta}>{med.dosage} • {med.frequency}</Text>
-                    <Text style={styles.listItemTextSmall}>Prescribed by {med.prescribed}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-            
-            <TouchableOpacity style={[styles.addActionButton, shadows.sm]}>
-              {/* <Plus size={18} color={colors.primary} /> */}
-              <Text style={styles.addActionButtonText}>Add New Medication</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-        
-        {/* Allergies Tab */}
-        {activeTab === 'allergies' && (
-          <View>
-            <View style={[styles.listCard, shadows.sm]}>
-              <View style={styles.listHeader}>
-                <Text style={styles.cardTitle}>Known Allergies</Text>
-                <Text style={styles.listSubTitle}>Allergic reactions and sensitivities</Text>
-              </View>
-              
-              <View style={styles.listContent}>
-                {allergies.map((allergy, index) => (
-                  <View 
-                    key={allergy.id} 
-                    style={[styles.listItem, index < allergies.length - 1 && styles.listItemDivider]}
-                  >
-                    <View style={styles.listItemRow}>
-                      <Text style={styles.listItemTitle}>{allergy.allergen}</Text>
-                      <View style={[styles.statusChip, getAllergySeverityStyle(allergy.severity)]}>
-                        <Text style={[styles.statusChipText, getAllergySeverityTextStyle(allergy.severity)]}>
-                          {allergy.severity}
-                        </Text>
-                      </View>
-                    </View>
-                    <Text style={styles.listItemMeta}>{allergy.reaction}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-            
-            <View style={[styles.card, shadows.sm, styles.marginTopMd]}>
-              <View style={styles.alertHeader}>
-                {/* <AlertTriangle size={20} color={colors.warning} style={styles.detailIcon} /> */}
-                <Text style={styles.activityTitle}>Important Notes</Text>
-              </View>
-              <Text style={styles.alertText}>
-                Always check for allergies before prescribing new medications. 
-                Notify all medical staff about severe allergies.
+          <TouchableOpacity style={styles.quickActionBtn}>
+             <Pill size={20} color={colors.primary} />
+             <Text style={styles.quickActionText}>Prescribe</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickActionBtn}>
+             <Calendar size={20} color={colors.primary} />
+             <Text style={styles.quickActionText}>Schedule</Text>
+          </TouchableOpacity>
+        </ScrollView>
+
+        {/* Modern Tabs (Pill Style) */}
+        <View style={styles.tabContainer}>
+          {['overview', 'history', 'medications', 'allergies'].map((tab) => (
+            <TouchableOpacity 
+              key={tab}
+              style={[styles.tabPill, activeTab === tab && styles.tabPillActive]}
+              onPress={() => setActiveTab(tab)}
+            >
+              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
               </Text>
-            </View>
-            
-            <TouchableOpacity style={[styles.addActionButton, shadows.sm]}>
-              {/* <Plus size={18} color={colors.primary} /> */}
-              <Text style={styles.addActionButtonText}>Add New Allergy</Text>
             </TouchableOpacity>
-          </View>
-        )}
-        <View style={styles.bottomSpacer} />
-      </ScrollView>
+          ))}
+        </View>
+
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          
+          {/* --- OVERVIEW TAB --- */}
+          {activeTab === 'overview' && (
+            <>
+              {/* Emergency Contact Card */}
+              <View style={styles.sectionCard}>
+                <View style={styles.cardHeader}>
+                  <Text style={styles.sectionTitle}>Emergency Contact</Text>
+                  <TouchableOpacity><Text style={styles.linkText}>Edit</Text></TouchableOpacity>
+                </View>
+                <View style={styles.infoRow}>
+                  <View style={styles.infoIconBox}>
+                    <User size={20} color={colors.gray600} />
+                  </View>
+                  <View>
+                    <Text style={styles.infoLabel}>{patientData.emergencyContact.relationship}</Text>
+                    <Text style={styles.infoValue}>{patientData.emergencyContact.name}</Text>
+                    <Text style={styles.infoSub}>{patientData.emergencyContact.phone}</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Recent Activity Timeline */}
+              <View style={styles.sectionCard}>
+                <Text style={styles.sectionTitle}>Recent Activity</Text>
+                <View style={styles.timelineContainer}>
+                  {[
+                    { title: 'New EMR Created', sub: 'Dr. Williams', icon: FileText, color: colors.primary },
+                    { title: 'Prescription Renewed', sub: 'Metformin', icon: Pill, color: colors.success },
+                    { title: 'Appt Scheduled', sub: 'Annual Physical', icon: Calendar, color: colors.warning },
+                  ].map((item, idx, arr) => (
+                    <View key={idx} style={styles.timelineItem}>
+                      <View style={styles.timelineLeft}>
+                        <View style={[styles.timelineDot, { backgroundColor: item.color }]} />
+                        {idx !== arr.length - 1 && <View style={styles.timelineLine} />}
+                      </View>
+                      <View style={styles.timelineContent}>
+                        <Text style={styles.timelineTitle}>{item.title}</Text>
+                        <Text style={styles.timelineSub}>{item.sub}</Text>
+                      </View>
+                      <Text style={styles.timelineTime}>2d ago</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            </>
+          )}
+
+          {/* --- HISTORY TAB --- */}
+          {activeTab === 'history' && (
+            <View>
+              <Text style={styles.tabHeader}>Medical Conditions</Text>
+              {medicalHistory.map((item) => {
+                 const style = getStatusColor(item.status);
+                 return (
+                  <View key={item.id} style={styles.cardItem}>
+                    <View style={styles.cardRow}>
+                      <Text style={styles.itemTitle}>{item.condition}</Text>
+                      <View style={[styles.statusBadge, { backgroundColor: style.bg }]}>
+                        <Text style={[styles.statusText, { color: style.text }]}>{item.status}</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.itemMeta}>Diagnosed in {item.diagnosed}</Text>
+                  </View>
+                 );
+              })}
+              
+              <Text style={[styles.tabHeader, { marginTop: 24 }]}>Past Appointments</Text>
+              {appointmentHistory.map((appt) => (
+                <View key={appt.id} style={styles.cardItem}>
+                   <View style={styles.cardRow}>
+                      <Text style={styles.itemTitle}>{appt.reason}</Text>
+                      <Text style={styles.dateText}>{appt.date}</Text>
+                   </View>
+                   <View style={styles.apptDetailRow}>
+                      <View style={styles.iconTag}>
+                        <Clock size={12} color={colors.gray500} />
+                        <Text style={styles.tagText}>{appt.time}</Text>
+                      </View>
+                      <View style={styles.iconTag}>
+                        <User size={12} color={colors.gray500} />
+                        <Text style={styles.tagText}>{appt.doctor}</Text>
+                      </View>
+                   </View>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* --- MEDICATIONS TAB --- */}
+          {activeTab === 'medications' && (
+            <View>
+               <TouchableOpacity style={styles.addButton}>
+                  <Plus size={20} color="white" />
+                  <Text style={styles.addButtonText}>Add Medication</Text>
+               </TouchableOpacity>
+
+               {medications.map((med) => (
+                 <View key={med.id} style={styles.medicationCard}>
+                    <View style={styles.medIcon}>
+                       <Pill size={24} color={colors.primary} />
+                    </View>
+                    <View style={{flex: 1}}>
+                       <Text style={styles.medName}>{med.name}</Text>
+                       <Text style={styles.medDose}>{med.dosage} • {med.frequency}</Text>
+                       <Text style={styles.medDoctor}>Px: {med.prescribed}</Text>
+                    </View>
+                    <ChevronRight size={20} color={colors.gray400} />
+                 </View>
+               ))}
+            </View>
+          )}
+
+          {/* --- ALLERGIES TAB --- */}
+          {activeTab === 'allergies' && (
+            <View>
+               <View style={styles.warningBanner}>
+                 <AlertTriangle size={20} color={colors.warningDark} />
+                 <Text style={styles.warningText}>
+                   Verify allergies before prescribing new medication.
+                 </Text>
+               </View>
+
+               {allergies.map((allergy) => {
+                 const style = getAllergyColor(allergy.severity);
+                 return (
+                  <View key={allergy.id} style={[styles.allergyCard, { borderColor: style.border, backgroundColor: style.bg }]}>
+                    <View style={styles.cardRow}>
+                      <Text style={[styles.allergyName, { color: style.text }]}>{allergy.allergen}</Text>
+                      <View style={[styles.severityBadge, { borderColor: style.text }]}>
+                        <Text style={[styles.severityText, { color: style.text }]}>{allergy.severity}</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.allergyReaction}>Reaction: {allergy.reaction}</Text>
+                  </View>
+                 );
+               })}
+            </View>
+          )}
+
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      </View>
     </View>
   );
 };
 
-// --- STYLESHEET DEFINITION ---
-
 const styles = StyleSheet.create({
-  // General
   container: {
     flex: 1,
-    backgroundColor: colors.gray100, // bg-gray-50
+    backgroundColor: '#F8F9FA', // Very light gray background
   },
-  marginTopMd: {
-    marginTop: spacing.md,
-  },
-  bottomSpacer: {
-    height: spacing.xl,
-  },
-
+  
   // Header
-  header: {
-    backgroundColor: colors.primary, // bg-blue-500 (assuming blue-500 is primary)
-    paddingTop: spacing.xxl, // pt-12 (for status bar)
-    paddingBottom: spacing.lg, // pb-6
-    paddingHorizontal: spacing.md, // px-4
-    marginBottom: -spacing.md, // Pull the actions up over the header background
+  headerContainer: {
+    backgroundColor: colors.primary,
+    paddingBottom: 80, // Space for the floating card overlap
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
   },
-  headerTopRow: {
+  headerNav: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.md, // mb-4
+    alignItems: 'center',
+    marginBottom: 20,
+    marginTop: 10,
+  },
+  navButton: {
+    padding: 8,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 12,
   },
   headerTitle: {
-    color: colors.white,
-    fontSize: 18, // text-lg
+    fontSize: 18,
     fontWeight: '700',
-  },
-  backIcon: {
-    transform: [{ rotate: '180deg' }],
-  },
-  headerSpacer: {
-    width: 28, // w-7 * 4, matching icon size
+    color: 'white',
   },
 
-  // Patient Info Card (inside header)
-  patientInfoCard: {
-    backgroundColor: colors.white,
-    borderRadius: radius.lg, // rounded-xl
-    padding: spacing.md, // p-4
-  },
-  patientInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.sm, // mb-3
-  },
-  avatarPlaceholder: {
-    backgroundColor: colors.gray200, // bg-gray-200
-    borderWidth: 2,
-    borderColor: colors.gray300, 
-    borderStyle: 'dashed',
-    borderRadius: radius.lg, // rounded-xl
-    width: 64, // w-16
-    height: 64, // h-16
-  },
-  patientDetails: {
-    marginLeft: spacing.md, // ml-4
-    flex: 1,
-  },
-  patientName: {
-    fontSize: 20, // text-xl
-    fontWeight: '700',
-    color: colors.gray800,
-  },
-  patientMeta: {
-    color: colors.gray600,
-  },
-  contactRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: spacing.sm, // mt-2
-  },
-  contactItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  contactText: {
-    color: colors.gray600,
-    marginLeft: spacing.xs, // ml-2
-    fontSize: 12, // text-sm
-  },
-
-  // Quick Actions
-  quickActionsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: spacing.md, // py-4
-    backgroundColor: colors.white,
-    marginHorizontal: spacing.md, // mx-4
-    borderRadius: radius.md, // rounded-lg
-    marginTop: -spacing.md, // -mt-6 adjusted for header padding
+  // Profile Card
+  profileCard: {
+    position: 'absolute',
+    bottom: -60,
+    left: 20,
+    right: 20,
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 20,
+    ...shadows.lg,
     zIndex: 10,
   },
-  actionButton: {
+  profileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatarContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.sm,
+    marginRight: 16,
   },
-  actionIconWrapper: {
-    borderRadius: radius.full,
-    padding: spacing.sm, // p-3
-    marginBottom: spacing.xs / 2, // mb-1
+  avatarText: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.primary,
   },
-  actionNewEMR: {
-    backgroundColor: colors.primaryLight, // bg-blue-100
+  profileInfo: {
+    flex: 1,
   },
-  actionPrescription: {
-    backgroundColor: colors.green100, // bg-green-100 (assuming green100 is defined)
+  profileName: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.gray900,
+    marginBottom: 4,
   },
-  actionSchedule: {
-    backgroundColor: colors.purple100, // bg-purple-100 (assuming purple100 is defined)
+  profileMeta: {
+    fontSize: 13,
+    color: colors.gray500,
+    fontWeight: '500',
   },
-  actionContact: {
-    backgroundColor: colors.orange100, // bg-orange-100 (assuming orange100 is defined)
+  profileDivider: {
+    height: 1,
+    backgroundColor: colors.gray100,
+    marginVertical: 16,
   },
-  actionText: {
-    fontSize: 10, // text-xs
+  contactGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  contactItem: {
+    alignItems: 'center',
+  },
+  iconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  contactLabel: {
+    fontSize: 12,
+    color: colors.gray600,
+    fontWeight: '500',
+  },
+
+  // Content Area
+  contentContainer: {
+    flex: 1,
+    marginTop: 70, // Push content down to account for floating card
+  },
+  quickActionsScroll: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+    maxHeight: 50,
+  },
+  quickActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 30,
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+  },
+  quickActionText: {
+    marginLeft: 8,
+    fontSize: 13,
+    fontWeight: '600',
     color: colors.gray700,
-    textAlign: 'center',
   },
 
   // Tabs
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: colors.white,
-    marginHorizontal: spacing.md, // mx-4
-    marginTop: spacing.sm, // mt-2
-    borderRadius: radius.md, // rounded-lg
+    paddingHorizontal: 20,
+    marginBottom: 20,
   },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 12, // py-3
-    alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: colors.white, // Default transparent border
+  tabPill: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginRight: 8,
+    backgroundColor: 'transparent',
   },
-  tabButtonActive: {
-    borderBottomColor: colors.primary, // border-blue-500
+  tabPillActive: {
+    backgroundColor: colors.primary,
   },
   tabText: {
-    // Shared text style
+    fontSize: 14,
+    color: colors.gray500,
+    fontWeight: '600',
   },
   tabTextActive: {
-    color: colors.primary, // text-blue-500
-    fontWeight: '500',
-  },
-  tabTextInactive: {
-    color: colors.gray500, // text-gray-500
+    color: 'white',
   },
 
-  // Content Scroll
-  contentScroll: {
-    flex: 1,
-    paddingHorizontal: spacing.md, // px-4
-    paddingVertical: spacing.md, // py-4
+  // Scroll Content
+  scrollContent: {
+    paddingHorizontal: 20,
   },
-  
-  // Card Styles (Overview Tab)
-  card: {
-    backgroundColor: colors.white,
-    borderRadius: radius.md, // rounded-lg
-    padding: spacing.md, // p-4
-    marginBottom: spacing.md, // mb-4
+  sectionCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    ...shadows.sm,
   },
-  cardHeaderRow: {
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm, // mb-3
+    marginBottom: 12,
   },
-  cardTitle: {
-    fontSize: 16, // text-lg
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.gray900,
+  },
+  linkText: {
+    color: colors.primary,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  infoIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: colors.gray100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  infoLabel: {
+    fontSize: 12,
+    color: colors.gray500,
+  },
+  infoValue: {
+    fontSize: 15,
     fontWeight: '600',
     color: colors.gray800,
   },
-  editText: {
-    color: colors.primary, // text-blue-500
-    fontSize: 14, // text-sm
-  },
-  
-  // Personal Information Details
-  detailGroup: {
-    gap: 12, // space-y-3
-  },
-  detailRow: {
-    flexDirection: 'row',
-    // alignItems: 'center', // Align top for multiline
-  },
-  detailLabel: {
-    color: colors.gray500,
-    width: 96, // w-32 (adjust width as needed for density)
-  },
-  detailValue: {
-    color: colors.gray800,
-    flex: 1,
-  },
-  detailValueBold: {
-    color: colors.gray800,
-    // No explicit font-weight needed here unless different from default
-  },
-  detailMeta: {
-    color: colors.gray600,
-    fontSize: 12, // text-sm
+  infoSub: {
+    fontSize: 12,
+    color: colors.gray400,
   },
 
-  // Upcoming Appointments
-  upcomingAppointment: {
-    borderLeftWidth: 2,
-    borderLeftColor: colors.blue200, // border-blue-200 (assuming blue200 is defined)
-    paddingLeft: spacing.sm, // pl-3
-    paddingVertical: spacing.xs, // py-1
+  // Timeline
+  timelineContainer: {
+    marginTop: 10,
   },
-  appointmentDateRow: {
+  timelineItem: {
     flexDirection: 'row',
+    marginBottom: 0,
+    minHeight: 60,
+  },
+  timelineLeft: {
     alignItems: 'center',
-    marginBottom: spacing.xs, // mb-2
+    marginRight: 12,
+    width: 16,
   },
-  appointmentMarker: {
-    backgroundColor: colors.primary, // bg-blue-500
-    borderRadius: radius.full,
-    padding: 6, // p-1 for icon size 12
-    marginLeft: -16 - 6, // Adjusted to align marker left of the border (border width 2, marker size 12, padding 3)
-    marginRight: spacing.xs, // mr-2
+  timelineDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginTop: 5,
   },
-  appointmentIcon: {
-    // Icon styles if needed
+  timelineLine: {
+    flex: 1,
+    width: 2,
+    backgroundColor: colors.gray200,
+    marginVertical: 4,
   },
-  appointmentDateText: {
-    fontWeight: '500',
+  timelineContent: {
+    flex: 1,
+    paddingBottom: 20,
+  },
+  timelineTitle: {
+    fontSize: 14,
+    fontWeight: '600',
     color: colors.gray800,
   },
-  appointmentReason: {
-    color: colors.gray700,
-    marginLeft: spacing.md, // ml-4
-  },
-  appointmentMeta: {
+  timelineSub: {
+    fontSize: 12,
     color: colors.gray500,
-    fontSize: 12, // text-sm
-    marginLeft: spacing.md, // ml-4
+  },
+  timelineTime: {
+    fontSize: 11,
+    color: colors.gray400,
   },
 
-  // Recent Activity
-  activityGroup: {
-    gap: 12, // space-y-3
-  },
-  activityRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  activityIconWrapper: {
-    borderRadius: radius.full,
-    padding: spacing.xs, // p-2
-    marginRight: spacing.sm, // mr-3
-  },
-  activityEMR: {
-    backgroundColor: colors.green100,
-  },
-  activityPrescription: {
-    backgroundColor: colors.primaryLight,
-  },
-  activitySchedule: {
-    backgroundColor: colors.purple100,
-  },
-  activityTitle: {
-    fontWeight: '500',
-    color: colors.gray800,
-  },
-  activityMeta: {
+  // Generic Card Items (History)
+  tabHeader: {
+    fontSize: 14,
+    fontWeight: '700',
     color: colors.gray500,
-    fontSize: 12, // text-sm
+    marginBottom: 12,
+    textTransform: 'uppercase',
   },
-
-  // List Card Styles (History, Medications, Allergies Tabs)
-  listCard: {
-    backgroundColor: colors.white,
-    borderRadius: radius.md,
-    marginBottom: spacing.md,
+  cardItem: {
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.gray100,
   },
-  listHeader: {
-    padding: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray200, // border-gray-100
-  },
-  listSubTitle: {
-    color: colors.gray500,
-    fontSize: 14, // text-sm
-  },
-  listContent: {
-    // No explicit style needed here, used for container
-  },
-  listItem: {
-    padding: spacing.md,
-  },
-  listItemDivider: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray200, // divide-y divide-gray-100
-  },
-  listItemRow: {
+  cardRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 4,
   },
-  listItemTitle: {
-    fontWeight: '500',
+  itemTitle: {
+    fontSize: 16,
+    fontWeight: '600',
     color: colors.gray800,
   },
-  listItemMeta: {
-    color: colors.gray600,
-    fontSize: 14, // text-sm
-    marginTop: 4,
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
-  listItemText: {
-    color: colors.gray600,
-    fontSize: 14, // text-sm
-    marginRight: spacing.md, // mr-4
+  statusText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
-  listItemTextSmall: {
+  itemMeta: {
+    fontSize: 13,
     color: colors.gray500,
-    fontSize: 12, // text-sm
-    marginTop: 4,
   },
-  appointmentDetailRow: {
+  dateText: {
+    fontSize: 13,
+    color: colors.gray500,
+  },
+  apptDetailRow: {
     flexDirection: 'row',
-    marginTop: spacing.xs,
+    marginTop: 8,
+  },
+  iconTag: {
+    flexDirection: 'row',
     alignItems: 'center',
+    marginRight: 16,
   },
-  detailIcon: {
-    marginRight: spacing.xs, // mr-1
-  },
-
-  // Status Chips
-  statusChip: {
-    paddingHorizontal: spacing.xs, // px-2
-    paddingVertical: 2, // py-1
-    borderRadius: radius.full,
-  },
-  statusChipText: {
-    fontSize: 10, // text-xs
-    fontWeight: '500',
-  },
-  statusChipActive: {
-    backgroundColor: colors.red100, // bg-red-100
-  },
-  statusTextActive: {
-    color: colors.red800, // text-red-800
-  },
-  statusChipManaged: {
-    backgroundColor: colors.green100, // bg-green-100
-  },
-  statusTextManaged: {
-    color: colors.green800, // text-green-800
-  },
-  statusChipInactive: {
-    backgroundColor: colors.gray200, // bg-gray-100
-  },
-  statusTextInactive: {
-    color: colors.gray800,
+  tagText: {
+    fontSize: 12,
+    color: colors.gray600,
+    marginLeft: 4,
   },
 
-  // Allergy Severity Chips
-  severityChipSevere: {
-    backgroundColor: colors.red100, 
-  },
-  severityTextSevere: {
-    color: colors.red800, 
-  },
-  severityChipModerate: {
-    backgroundColor: colors.orange100, // bg-orange-100
-  },
-  severityTextModerate: {
-    color: colors.orange800, // text-orange-800
-  },
-  severityChipMild: {
-    backgroundColor: colors.yellow100, // bg-yellow-100
-  },
-  severityTextMild: {
-    color: colors.yellow800, // text-yellow-800
-  },
-
-  // Add Action Button
-  addActionButton: {
+  // Medications
+  addButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.white,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    marginTop: spacing.md,
+    backgroundColor: colors.primary,
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 20,
+    ...shadows.sm,
   },
-  addActionButtonText: {
-    color: colors.primary, // text-blue-500
-    fontWeight: '500',
-    marginLeft: spacing.xs, // ml-2
+  addButtonText: {
+    color: 'white',
+    fontWeight: '700',
+    marginLeft: 8,
   },
-
-  // Allergy Notes
-  alertHeader: {
+  medicationCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.xs,
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 12,
+    ...shadows.sm,
   },
-  alertText: {
+  medIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  medName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.gray900,
+  },
+  medDose: {
+    fontSize: 13,
     color: colors.gray600,
-    fontSize: 14, // text-sm
-    marginTop: spacing.xs,
+    marginBottom: 2,
+  },
+  medDoctor: {
+    fontSize: 11,
+    color: colors.gray400,
+    fontStyle: 'italic',
+  },
+
+  // Allergies
+  warningBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFBEB',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#FEF3C7',
+  },
+  warningText: {
+    flex: 1,
+    marginLeft: 12,
+    color: '#B45309',
+    fontSize: 13,
+  },
+  allergyCard: {
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderWidth: 1,
+  },
+  allergyName: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  severityBadge: {
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  severityText: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  allergyReaction: {
+    marginTop: 8,
+    color: colors.gray700,
+    fontSize: 13,
   },
 });
 

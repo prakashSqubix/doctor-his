@@ -15,6 +15,7 @@ import { colors, spacing, typography, radius, shadows } from '../../Constants/th
 import { BuildingIcon } from '../../../assets/svg';
 import { useSelectTenantMutation } from '../../hooks/useAuth';
 import RouterConstants from '../../Constants/RouterConstants';
+import { Calendar, Hospital } from 'lucide-react-native';
 
 export default function TenantSelectionScreen() {
   const navigation = useNavigation();
@@ -25,6 +26,7 @@ export default function TenantSelectionScreen() {
     tenantSelectionToken, 
     userId 
   } = useSelector((state) => state.loginFlow);
+console.log('availableTenants',availableTenants);
 
   const selectTenantMutation = useSelectTenantMutation();
 console.log('userid',userId);
@@ -83,8 +85,10 @@ const tenantList = availableTenants?.filter(item =>
       <ScrollView
         style={styles.listContainer}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
-      >
+        contentContainerStyle={tenantList?.length === 0 ? { flex: 1 } : styles.listContent}
+      >{
+        tenantList?.length?
+        <>
         {tenantList?.map((tenant) => (
           <TouchableOpacity
             key={tenant.tenantId}
@@ -99,9 +103,10 @@ const tenantList = availableTenants?.filter(item =>
                 styles.iconWrapper,
                 selectedTenantId === tenant.tenantId && styles.iconWrapperSelected
               ]}>
-                <BuildingIcon 
+                <Hospital color={selectedTenantId === tenant.tenantId ? colors.primary : colors.textSecondary} size={25} />
+                {/* <BuildingIcon 
                   fill={selectedTenantId === tenant.tenantId ? colors.primary : colors.textSecondary}
-                />
+                /> */}
               </View>
 
               <View style={styles.textWrapper}>
@@ -152,6 +157,20 @@ const tenantList = availableTenants?.filter(item =>
             )}
           </TouchableOpacity>
         ))}
+        </>:<View style={styles.emptyContainer}>
+      <View style={styles.emptyIconCircle}>
+        <Hospital color={colors.textTertiary} size={50} />
+      </View>
+      <Text style={[typography.h3, styles.emptyTitle]}>
+        No Workplaces Found
+      </Text>
+      <Text style={[typography.body, styles.emptySubtitle]}>
+        You don't have any workplaces assigned to your account. Please contact your administrator.
+      </Text>
+      
+     
+    </View>
+      }
       </ScrollView>
 
       <View style={styles.footer}>
@@ -223,7 +242,7 @@ const styles = StyleSheet.create({
   cardContent: {
     flex: 1,
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
   iconWrapper: {
     width: 48,
@@ -261,5 +280,42 @@ const styles = StyleSheet.create({
   },
   button: {
     width: '100%',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  emptyIconCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: colors.surfaceVariant, // or a very light gray
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  emptyTitle: {
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  emptySubtitle: {
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: spacing.xl,
+  },
+  refreshButton: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+  },
+  refreshButtonText: {
+    ...typography.bodyBold,
+    color: colors.primary,
   },
 });

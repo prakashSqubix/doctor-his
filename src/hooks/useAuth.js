@@ -21,7 +21,6 @@ export const useLoginMutation = () => {
     mutationFn: async (payload) => {
       const res = await authAPI.loginUser(payload);
       const { statusCode, message, data: responseData } = res;
-
       if (statusCode !== 200) {
         throw new Error(message || "Login failed");
       }
@@ -30,7 +29,7 @@ export const useLoginMutation = () => {
       // ROLE CHECK
       
       // ------ CASE A ------
-      if (responseData.accessToken && responseData.refreshToken) {
+      if (responseData.accessToken || responseData.refreshToken) {
         const userRoles = responseData?.tenants?.flatMap(r=>r?.roles) || [];
         
         const isDoctorRole = userRoles.some(role =>
@@ -43,10 +42,10 @@ export const useLoginMutation = () => {
         dispatch(
           loginSuccess({
             user: {
-              userId: responseData._id,
+              userId: responseData.userId,
               fullName: responseData.fullName,
-              tenant: responseData.tenant,
-              facility: responseData.facility,
+              tenant: responseData.tenants[0],
+              facility: responseData.facilities[0],
               roles: responseData.roles,
             },
             tokens: {

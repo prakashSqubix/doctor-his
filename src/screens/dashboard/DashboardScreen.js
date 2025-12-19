@@ -7,7 +7,8 @@ import {
   Image,
   Alert,
   StyleSheet,
-  Dimensions
+  Dimensions,
+  StatusBar
 } from "react-native";
 import { LogoutIcon } from '../../../assets/svg';
 // CHECK THIS PATH: Ensure this matches your project structure
@@ -17,20 +18,37 @@ import { useLogoutMutation } from "../../hooks/useAuth";
 import { useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
-
-// Icons commented out as per original file
-// import { ... } from "lucide-react-native";
-
+import {useDashboardQuery} from '../../hooks/useDashboard' 
+import { useVisitListQuery } from '../../hooks/useEmr'; 
+import {
+  Calendar,
+  User,
+  FileText,
+  Stethoscope,
+  MessageSquare,
+  Clock,
+  Users,
+  BarChart2,
+  Settings,
+  Plus,
+  ChevronRight,
+  Camera,
+  Upload,
+} from "lucide-react-native";
+import moment from 'moment'
 const DashboardScreen = () => {
+  const {data , isLoading , error} = useDashboardQuery()
   const insets = useSafeAreaInsets();
+  
   const { user } = useSelector((state) => state.auth);
+
   const [activeTab, setActiveTab] = useState("dashboard");
   const logoutMutation = useLogoutMutation();
   const navigation = useNavigation()
   const handleLogout = () => {
     Alert.alert(
       'Logout',
-      'Are you sure you want to logout?',
+      'Are you sure want to logout?',
       [
         {
           text: 'Cancel',
@@ -71,17 +89,33 @@ const DashboardScreen = () => {
 
   const stats = {
     todayAppointments: 12,
+    todayAppointmentsId: '693006591f88a2e6cbf460c2',
     totalPatients: 248,
+    checkinAppoId: '69301ed71f88a2e6cbf460c7',
     completed: 8,
     pending: 4,
   };
 
-  const appointments = [
-    { id: 1, patient: "John Smith", time: "09:00 AM", type: "Follow-up", avatar: "https://images.unsplash.com/photo-1629216509258-4dbd7880e605?w=900" },
-    { id: 2, patient: "Emma Wilson", time: "10:30 AM", type: "New Consultation", avatar: "https://images.unsplash.com/photo-1600675608140-991fcf38cc6e?w=900" },
-    { id: 3, patient: "Michael Brown", time: "02:15 PM", type: "Check-up", avatar: "https://images.unsplash.com/photo-1660142107232-e26dd2036dd8?w=900" },
-    { id: 4, patient: "Lisa Davis", time: "04:00 PM", type: "Emergency", avatar: "https://images.unsplash.com/photo-1675351085230-ab39b2289ff4?w=900" },
-  ];
+  const { data: apiAppointmentData, isLoading: isAppointmentsLoading } = useVisitListQuery({
+    from: moment().format('YYYY-MM-DD'),
+    to: moment().format('YYYY-MM-DD')
+  });
+
+  const appointments = React.useMemo(() => {
+    if (apiAppointmentData?.data?.data && Array.isArray(apiAppointmentData?.data?.data)) {
+      return apiAppointmentData.data.data
+        .slice(0, 4)
+        .map(visit => ({
+          ...visit,
+           avatar: `https://images.unsplash.com/photo-${
+              Math.random() > 0.5
+                ? '1527980965255-d3b416303d12'
+                : '1494790108377-be9c29b29330'
+            }?w=900`,
+        }));
+    }
+    return [];
+  }, [apiAppointmentData]);
 
   const recentEMRs = [
     { id: 1, patient: "Robert Johnson", date: "2023-06-15", condition: "Hypertension" },
@@ -97,14 +131,22 @@ const DashboardScreen = () => {
     ]);
   };
 
+
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={[styles.header,{paddingTop:insets.top}]}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
+      <View style={[styles.header,{paddingTop:insets.top+10}]}>
         <View style={styles.headerTop}>
           <View>
-            <Text style={styles.headerGreeting}>Good Morning,</Text>
+            <Text style={styles.headerGreeting}>
+              {new Date().getHours() < 12 
+                ? 'Good Morning,' 
+                : new Date().getHours() < 17 
+                  ? 'Good Afternoon,' 
+                  : 'Good Evening,'}
             <Text style={styles.headerName}>{user?.fullName ? user.fullName.split(' ')[0] : 'Doctor'}</Text>
+            </Text>
           </View>
 
           <TouchableOpacity style={styles.avatarContainer} onPress={handleLogout}>
@@ -118,14 +160,14 @@ const DashboardScreen = () => {
         </View>
 
         <View style={styles.facilitiesContainer}>
-          <Text style={styles.facilitiesLabel}>Facilities</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.facilitiesScroll}>
+          {/* <Text style={styles.facilitiesLabel}>Facilities</Text> */}
+          {/* <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.facilitiesScroll}>
             {doctor.facilities.map((facility, index) => (
               <View key={index} style={styles.facilityChip}>
                 <Text style={styles.facilityText}>{facility}</Text>
               </View>
             ))}
-          </ScrollView>
+          </ScrollView> */}
         </View>
       </View>
 
@@ -133,27 +175,27 @@ const DashboardScreen = () => {
       <View style={styles.statsContainer}>
         <View style={styles.statsRow}>
           {/* Added shadows.sm here */}
-          <TouchableOpacity style={[styles.statCard, shadows.sm]} >
+          <TouchableOpacity disabled style={[styles.statCard, shadows.sm]} >
             <View style={styles.statContent}>
               <View style={[styles.iconBox, styles.bgPrimaryLight]}>
-                {/* <Calendar color={colors.primary} size={20} /> */}
+                <Calendar color={colors.primary} size={20} />
               </View>
               <View style={styles.statInfo}>
                 <Text style={styles.statLabel}>Today</Text>
-                <Text style={styles.statValue}>{stats.todayAppointments}</Text>
+                <Text style={styles.statValue}>{data?.data?.find(item => item.cardId === '693006591f88a2e6cbf460c2')?.data?.[0]?.count}</Text>
               </View>
             </View>
           </TouchableOpacity>
 
           {/* Added shadows.sm here */}
-          <TouchableOpacity style={[styles.statCard, shadows.sm]}>
+          <TouchableOpacity disabled style={[styles.statCard, shadows.sm]}>
             <View style={styles.statContent}>
               <View style={[styles.iconBox, styles.bgSuccessLight]}>
-                {/* <Users color={colors.success} size={20} /> */}
+                <Users color={colors.success} size={20} />
               </View>
               <View style={styles.statInfo}>
-                <Text style={styles.statLabel}>Patients</Text>
-                <Text style={styles.statValue}>{stats.totalPatients}</Text>
+                <Text style={styles.statLabel}>Check-In</Text>
+                <Text style={styles.statValue}>{data?.data?.find(item => item.cardId === '69301ed71f88a2e6cbf460c7')?.data?.[0]?.count}</Text>
               </View>
             </View>
           </TouchableOpacity>
@@ -161,27 +203,32 @@ const DashboardScreen = () => {
 
         <View style={styles.statsRow}>
           {/* Added shadows.sm here */}
-          <TouchableOpacity style={[styles.statCard, shadows.sm]}>
-            <View style={styles.statContentJustified}>
-              <View>
+          {/* {
+            data?.data?.map((v)=> */}
+          <TouchableOpacity disabled style={[styles.statCard, shadows.sm]}>
+            <View style={styles.statContent}>
+            <View style={[styles.iconBox, styles.bgSuccessLight]}>
+                <Stethoscope color={colors.success} size={20} />
+              </View>
+              <View style={styles.statInfo}>
                 <Text style={styles.statLabel}>Completed</Text>
                 <Text style={[styles.statValue, { color: colors.success }]}>{stats.completed}</Text>
               </View>
-              <View style={[styles.iconBox, styles.bgSuccessLight]}>
-                {/* <Stethoscope color={colors.success} size={20} /> */}
-              </View>
+              
             </View>
           </TouchableOpacity>
+            {/* )
+          } */}
 
           {/* Added shadows.sm here */}
-          <TouchableOpacity style={[styles.statCard, shadows.sm]}>
-            <View style={styles.statContentJustified}>
-              <View>
+          <TouchableOpacity disabled style={[styles.statCard, shadows.sm]}>
+            <View style={styles.statContent}>
+            <View style={[styles.iconBox, styles.bgWarningLight]}>
+                <Clock color={colors.warning} size={20} />
+              </View>
+              <View style={styles.statInfo}>
                 <Text style={styles.statLabel}>Pending</Text>
                 <Text style={[styles.statValue, { color: colors.warning }]}>{stats.pending}</Text>
-              </View>
-              <View style={[styles.iconBox, styles.bgWarningLight]}>
-                {/* <Clock color={colors.warning} size={20} /> */}
               </View>
             </View>
           </TouchableOpacity>
@@ -194,30 +241,31 @@ const DashboardScreen = () => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Today's Appointments</Text>
-            <TouchableOpacity style={styles.viewAllButton}>
+            <TouchableOpacity style={styles.viewAllButton} onPress={()=>navigation.navigate(RouterConstants.AppointmentScreen)}>
               <Text style={styles.viewAllText}>View All</Text>
-              {/* <ChevronRight color={colors.info} size={16} /> */}
+              <ChevronRight color={colors.info} size={16} />
             </TouchableOpacity>
           </View>
 
           {/* Added shadows.sm here */}
           <View style={[styles.cardList, shadows.sm]}>
-            {appointments.map((appointment, index) => (
+            {appointments?.map((appointment, index) => (
               <TouchableOpacity 
                 key={appointment.id} 
                 style={[
                   styles.appointmentRow, 
                   index === appointments.length - 1 && styles.lastRow
                 ]}
-                onPress={()=>navigation.navigate(RouterConstants.PatientDetailsScreen)}
+                onPress={()=>navigation.navigate(RouterConstants.EmrGenerationScreen,{patientData:appointment})}
               >
                 <Image source={{ uri: appointment.avatar }} style={styles.listAvatar} />
                 <View style={styles.listContent}>
-                  <Text style={styles.listTitle}>{appointment.patient}</Text>
-                  <Text style={styles.listSubtitle}>{appointment.type}</Text>
+                  <Text style={styles.listTitle}>{appointment.patientName}</Text>
+                  <Text style={styles.listSubtitle}>{appointment.appointmentType}</Text>
                 </View>
                 <View style={styles.listRight}>
-                  <Text style={styles.listTitle}>{appointment.time}</Text>
+                  {/* <Text style={styles.listTitle}>{appointment.scheduledTime}</Text> */}
+                  <Text style={styles.listTitle}>{moment(appointment?.scheduledTime, "HH:mm").format("hh:mm A")}</Text>
                 </View>
               </TouchableOpacity>
             ))}
@@ -230,7 +278,7 @@ const DashboardScreen = () => {
             <Text style={styles.sectionTitle}>Recent EMRs</Text>
             <TouchableOpacity style={styles.viewAllButton}>
               <Text style={styles.viewAllText}>View All</Text>
-              {/* <ChevronRight color={colors.info} size={16} /> */}
+              <ChevronRight color={colors.info} size={16} />
             </TouchableOpacity>
           </View>
 
@@ -245,7 +293,7 @@ const DashboardScreen = () => {
                 ]}
               >
                 <View style={[styles.iconBox, styles.bgPrimaryLight]}>
-                  {/* <FileText color={colors.primary} size={20} /> */}
+                  <FileText color={colors.primary} size={20} />
                 </View>
                 <View style={styles.listContent}>
                   <Text style={styles.listTitle}>{emr.patient}</Text>
@@ -265,7 +313,7 @@ const DashboardScreen = () => {
             <TouchableOpacity onPress={()=>navigation.navigate(RouterConstants.EmrGenerationScreen)} style={[styles.statCard, shadows.sm]}>
               <View style={styles.centerContent}>
                 <View style={[styles.largeIconCircle, styles.bgPrimaryLight]}>
-                  {/* <FileText size={24} color={colors.primary} /> */}
+                  <FileText size={24} color={colors.primary} />
                 </View>
                 <Text style={styles.actionLabel}>Generate EMR</Text>
               </View>
@@ -275,7 +323,7 @@ const DashboardScreen = () => {
             <TouchableOpacity style={[styles.statCard, shadows.sm]}>
               <View style={styles.centerContent}>
                 <View style={[styles.largeIconCircle, styles.bgSuccessLight]}>
-                  {/* <Stethoscope size={24} color={colors.success} /> */}
+                  <Stethoscope size={24} color={colors.success} />
                 </View>
                 <Text style={styles.actionLabel}>Prescription</Text>
               </View>
@@ -287,7 +335,7 @@ const DashboardScreen = () => {
         <View style={styles.aiCard}>
           <View style={styles.aiContent}>
             <View style={styles.aiIconBox}>
-              {/* <MessageSquare color="white" size={24} /> */}
+              <MessageSquare color="white" size={24} />
             </View>
             <View style={styles.aiTextContainer}>
               <Text style={styles.aiTitle}>AI Medical Assistant</Text>
@@ -314,7 +362,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.primary,
     // paddingTop: spacing.xxl, 
-    paddingBottom: spacing.lg, 
+    paddingBottom: spacing.xl, 
     paddingHorizontal: spacing.md, 
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
@@ -381,6 +429,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12, 
     marginBottom: 12,
+    flexWrap:'wrap'
   },
   // REMOVED ...shadows.sm FROM HERE
   statCard: {

@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import authReducer from './slices/authSlice';
 import loginFlowReducer from './slices/loginFlowSlice';
+import tokenSyncMiddleware from './middleware/tokenSyncMiddleware';
 
 // Persist config
 const persistConfig = {
@@ -37,7 +38,7 @@ export const store = configureStore({
       serializableCheck: {
         ignoredActions: ['persist/PERSIST', 'persist/REHYDRATE'],
       },
-    }),
+    }).concat(tokenSyncMiddleware),
   devTools: __DEV__,
 });
 

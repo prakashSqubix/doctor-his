@@ -16,8 +16,10 @@ import { useLoginMutation } from '../../hooks/useAuth';
 
 export default function LoginScreen() {
   const navigation = useNavigation();
-  const [email, setEmail] = useState('alice.doe@squbix.com');
-  const [password, setPassword] = useState('Dj123456');
+  const [email, setEmail] = useState('milan.mohapatra@squbix.com');
+  const [password, setPassword] = useState('Milan@123');
+  // const [email, setEmail] = useState('deepak.senapati@squbix.com');
+  // const [password, setPassword] = useState('99999999');
   const [errors, setErrors] = useState({});
   
   const { error: authError } = useSelector((state) => state.auth);
@@ -136,7 +138,7 @@ export default function LoginScreen() {
         </View>
 
         {/* Demo Credentials */}
-        <View style={styles.demoSection}>
+        {/* <View style={styles.demoSection}>
           <Text style={[typography.caption, styles.demoTitle]}>Demo Login</Text>
           <Text style={[typography.caption, styles.demoText]}>
             Use any email and password (min 6 chars)
@@ -144,13 +146,13 @@ export default function LoginScreen() {
           <Text style={[typography.caption, styles.demoExample]}>
             Example: demo@clinic.com / password123
           </Text>
-        </View>
+        </View> */}
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={[typography.bodySm, styles.footerText]}>
+          {/* <Text style={[typography.bodySm, styles.footerText]}>
             This is a demo app with sample data
-          </Text>
+          </Text> */}
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

@@ -26,7 +26,6 @@ export default function FacilitySelectionScreen() {
     userId, 
     selectedTenantId 
   } = useSelector((state) => state.loginFlow);
-console.log('selectedTenantId,userId',userId,selectedTenantId);
 
   const selectFacilityMutation = useSelectFacilityMutation();
 
@@ -107,7 +106,7 @@ console.log('selectedTenantId,userId',userId,selectedTenantId);
                   {facility.name}
                 </Text>
 
-                {facility.address && (
+                {/* {facility.address && (
                   <Text
                     style={[
                       typography.caption,
@@ -117,7 +116,7 @@ console.log('selectedTenantId,userId',userId,selectedTenantId);
                   >
                     {facility.address}
                   </Text>
-                )}
+                )} */}
               </View>
             </View>
 

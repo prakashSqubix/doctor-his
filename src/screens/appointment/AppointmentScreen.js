@@ -1,146 +1,252 @@
-import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  ScrollView, 
-  TouchableOpacity, 
-  Image, 
-  TextInput, 
-  StyleSheet 
+import React, { useState, useCallback } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  TextInput,
+  StyleSheet,
+  RefreshControl,
+  Platform
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 // Import your theme file
-import { colors, spacing, typography, radius, shadows } from '../../Constants/theme';
+import {
+  colors,
+  spacing,
+  typography,
+  radius,
+  shadows,
+} from '../../Constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Icons commented out
-// import { Calendar, Clock, MapPin, User, CheckCircle, CalendarClock, XCircle, Filter, Search, ChevronDown } from 'lucide-react-native';
-
+import {
+  Calendar,
+  Clock,
+  MapPin,
+  CheckCircle,
+  CalendarClock,
+  XCircle,
+  Filter,
+  Search,
+  ChevronDown,
+} from 'lucide-react-native';
+import { useVisitCompleteMutation, useVisitListQuery } from '../../hooks/useEmr';
+import CheckInModal from './components/CheckInModal';
+import RouterConstants from '../../Constants/RouterConstants';
+import { useNavigation } from '@react-navigation/native';
+import EmptyState from './components/EmptyState';
 const AppointmentsScreen = () => {
+  const navigation = useNavigation()
+  const [visible, setVisible] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const insets = useSafeAreaInsets()
-  // --- START: UPDATED MOCK DATA TO MATCH NEW JSON STRUCTURE ---
-  const appointments = [
-    {
-      _id: "6932d42f68f38e42360d51dd",
-      appointmentId: "6932d42fe78e9cfc946204e0",
-      patientName: "Test Patient",
-      patientPhone: "1234567890",
-      encounterId: "APP-1",
-      scheduledTime: "09:00 AM", // Using a combined time for display
-      visitDate: "2025-08-12",
-      status: "BOOKED", // Used for filtering and status badge
-      doctorName: "Swaugat", // Used as Facility/Doctor name for mock consistency
-      // Add mock avatar and reason/notes since they are required for card rendering
-      patientAvatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=900",
-      reason: "Routine Follow-up",
-      notes: "Patient reports feeling well.",
-      appointmentType: "APPOINTMENT",
-    },
-    {
-      _id: "6932d442e78e9cfc946204e1",
-      patientName: "Chinmay Roy",
-      patientPhone: "7787044454",
-      encounterId: "APP-2",
-      scheduledTime: "10:55 AM",
-      visitDate: "2025-08-12",
-      status: "BOOKED",
-      doctorName: "Swaugat",
-      patientAvatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=900",
-      reason: "New Consultation",
-      notes: "Previous history of arrhythmia.",
-      appointmentType: "APPOINTMENT",
-    },
-    {
-      _id: "6936bb3a65e141f3a00cae8c",
-      patientName: "Test Patient",
-      patientPhone: "1234567890",
-      encounterId: "APP-3",
-      scheduledTime: "10:40 AM",
-      visitDate: "2025-09-12",
-      status: "CHECKED_IN",
-      doctorName: "Swaugat",
-      patientAvatar: "https://images.unsplash.com/photo-1568602471122-7832951cc4c5?w=900",
-      reason: "Blood Pressure Review",
-      notes: "Check-in successful, waiting for token.",
-      appointmentType: "APPOINTMENT",
-    },
-    {
-      _id: "6936bb7865e141f3a00cae8d",
-      patientName: "Test Patient",
-      patientPhone: "1234567890",
-      encounterId: "APP-1",
-      scheduledTime: "10:25 AM",
-      visitDate: "2025-10-12",
-      status: "CHECKED_IN",
-      doctorName: "Swaugat",
-      patientAvatar: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=900",
-      reason: "Annual Check-up",
-      notes: "Token 691D6B1C40-0004 assigned.",
-      appointmentType: "APPOINTMENT",
-    },
-  ];
-  // --- END: UPDATED MOCK DATA ---
+  // Date Filter State
+  const [dateFilter, setDateFilter] = useState('TODAY'); // TODAY, YESTERDAY, TOMORROW, CUSTOM
+  const [customDateRange, setCustomDateRange] = useState({ start: '', end: '' }); // YYYY-MM-DD
+  const [showCustomDateModal, setShowCustomDateModal] = useState(false);
+  const [tempDateRange, setTempDateRange] = useState({ start: '', end: '' });
+  
+  // DateTimePicker State
+  const [showPicker, setShowPicker] = useState({ show: false, mode: 'date', type: 'start' });
+
+  // Helper to get formatted date string YYYY-MM-DD
+  const formatDate = (date) => {
+    return date.toISOString().split('T')[0];
+  };
+
+  const onDateChange = (event, selectedDate) => {
+    const currentDate = selectedDate;
+    
+    // Close picker on Android immediately
+    if (Platform.OS === 'android') {
+        setShowPicker({ ...showPicker, show: false });
+    }
+    
+    if (currentDate) {
+        if(showPicker.type === 'start') {
+             setTempDateRange(prev => ({ ...prev, start: formatDate(currentDate) }));
+        } else {
+             setTempDateRange(prev => ({ ...prev, end: formatDate(currentDate) }));
+        }
+    }
+  };
+
+  // Calculate Date Range based on filter
+  const getDateRange = useCallback(() => {
+    const today = new Date();
+    
+    switch (dateFilter) {
+      case 'TODAY':
+        return { from: formatDate(today), to: formatDate(today) };
+      case 'YESTERDAY':
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        return { from: formatDate(yesterday), to: formatDate(yesterday) };
+      case 'TOMORROW':
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        return { from: formatDate(tomorrow), to: formatDate(tomorrow) };
+      case 'CUSTOM':
+        return { 
+          from: customDateRange.start || formatDate(today), 
+          to: customDateRange.end || formatDate(today) 
+        };
+      default:
+        return { from: formatDate(today), to: formatDate(today) };
+    }
+  }, [dateFilter, customDateRange]);
+
+  const { from: fromDate, to: toDate } = getDateRange();
+
+  const {
+    data: apiData,
+    isLoading,
+    error,
+    refetch,
+    isRefetching
+  } = useVisitListQuery({
+    from: fromDate, 
+    to: toDate,
+  });
+
+  const handleCustomDateSubmit = () => {
+    // Basic validation
+    if (tempDateRange.start && tempDateRange.end) {
+        if (new Date(tempDateRange.start) > new Date(tempDateRange.end)) {
+            // This should be prevented by picker constraints, but safety check:
+             return; 
+        }
+        setCustomDateRange(tempDateRange);
+        setDateFilter('CUSTOM');
+        setShowCustomDateModal(false);
+    } else {
+        // Fallback or alert if needed
+        if(tempDateRange.start) {
+             setCustomDateRange({start: tempDateRange.start, end: tempDateRange.start});
+             setDateFilter('CUSTOM');
+             setShowCustomDateModal(false);
+        } else {
+            setDateFilter('TODAY');
+            setShowCustomDateModal(false);
+        }
+    }
+  };
+
+  const {mutate,data:confirmationRes ,isLoading:confirmationLoading ,error:confirmationError,  } = useVisitCompleteMutation()
+ 
+  const insets = useSafeAreaInsets();
+ console.log('checkinnn',confirmationRes,confirmationLoading,confirmationError);
+ 
+ const resetFilters = () => {
+    setActiveFilter('all');
+    setDateFilter('TODAY');
+    setCustomDateRange({ start: '', end: '' });
+    setSearchQuery('');
+ };
+
+  const handleCompleteVisit =(query)=>{
+    console.log('callled',query);
+    
+    mutate({
+      "slotId": query?.slotId,
+      "appointmentId": query?.appointmentId,
+      "registrationId": query?.registrationId,
+      "notes": query?.drNote
+    })
+  }
+
+  const onRefresh = useCallback(() => {
+    refetch();
+  }, [refetch]);
+
+  // Transform API data to match expected format or use mock data
+  const appointments = React.useMemo(() => {
+    if (apiData?.data?.data && Array.isArray(apiData?.data?.data)) {
+      return apiData?.data?.data?.map(visit => ({
+        
+        patientAvatar: `https://images.unsplash.com/photo-${
+          Math.random() > 0.5
+            ? '1527980965255-d3b416303d12'
+            : '1494790108377-be9c29b29330'
+        }?w=900`,
+        ...visit
+      }));
+    }
+    return [];
+  }, [apiData]);
 
   // Filter appointments based on active filter
-  const filteredAppointments = appointments.filter(appointment => {
-    // Standardize filter values to uppercase for matching (e.g., BOOKED)
-    const normalizedStatus = appointment.status.toUpperCase();
+  const filteredAppointments = appointments
+    .filter(appointment => {
+      // Standardize filter values to uppercase for matching (e.g., BOOKED)
+      const normalizedStatus = appointment.status.toUpperCase();
 
-    if (activeFilter === 'all') return true;
-    
-    // Filter by status (BOOKED, CHECKED_IN, etc.)
-    if (activeFilter.toUpperCase() === normalizedStatus) return true;
+      if (activeFilter === 'all') return true;
 
-    if (activeFilter === 'today') {
-      const today = new Date().toISOString().split('T')[0];
-      return appointment.visitDate === today;
-    }
-    if (activeFilter === 'upcoming') {
-      const today = new Date();
-      const appointmentDate = new Date(appointment.visitDate);
-      // Checking if the appointment date is today or in the future
-      return appointmentDate >= new Date(today.setHours(0, 0, 0, 0));
-    }
-    // Search by Patient Name
-    return appointment.patientName.toLowerCase().includes(searchQuery.toLowerCase());
-  }).filter(appointment => 
-    appointment.patientName.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+      // Filter by status (BOOKED, CHECKED_IN, etc.)
+      if (activeFilter.toUpperCase() === normalizedStatus) return true;
+
+      if (activeFilter === 'today') {
+        const today = new Date().toISOString().split('T')[0];
+        return appointment.visitDate === today;
+      }
+      if (activeFilter === 'upcoming') {
+        const today = new Date();
+        const appointmentDate = new Date(appointment.visitDate);
+        // Checking if the appointment date is today or in the future
+        return appointmentDate >= new Date(today.setHours(0, 0, 0, 0));
+      }
+      // Search by Patient Name
+      return appointment.patientName
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase());
+    })
+    .filter(appointment =>
+      appointment.patientName.toLowerCase().includes(searchQuery.toLowerCase()),
+    );
 
   // Filters for dynamic buttons (derived from unique statuses)
-  const statusFilters = [...new Set(appointments.map(a => a.status.toUpperCase()))];
+  const statusFilters = [
+    ...new Set(appointments.map(a => a.status.toUpperCase())),
+  ];
   // Add 'Today' and 'Upcoming' only if they aren't statuses
   if (!statusFilters.includes('TODAY')) statusFilters.push('TODAY');
   if (!statusFilters.includes('UPCOMING')) statusFilters.push('UPCOMING');
-  
+
   // Facilities/Doctors for filter dropdown (using doctorName from new JSON)
-  const facilities = [...new Set(appointments.map(a => a.doctorName))];
+  const facilities = [];
 
   // Helper to format filter text for display
-  const formatFilterText = (filter) => {
-    return filter.replace(/_/g, ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
-  }
+  const formatFilterText = filter => {
+    return filter
+      .replace(/_/g, ' ')
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  };
 
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={[styles.header,{paddingTop:insets.top}]}>
+      <View style={[styles.header, { paddingTop: insets.top }]}>
         <View style={styles.headerTop}>
           <Text style={styles.headerTitle}>Appointments</Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.filterButton}
             onPress={() => setShowFilters(!showFilters)}
           >
-            {/* <Filter color="white" size={24} /> */}
+            <Filter color="white" size={24} />
           </TouchableOpacity>
         </View>
-        
+
         {/* Search Bar */}
         <View style={styles.searchContainer}>
-          {/* <Search color="white" size={20} /> */}
+          <Search color="white" size={20} />
           <TextInput
             placeholder="Search patients..."
             placeholderTextColor="#FFFFFFAA"
@@ -150,34 +256,80 @@ const AppointmentsScreen = () => {
           />
         </View>
       </View>
-
-      {/* Filters */}
+      {(visible && selectedAppointment) && (
+        <CheckInModal
+          visible={visible}
+          onClose={() => {
+            setVisible(false), setSelectedAppointment('');
+          }}
+          onConfirm={handleCompleteVisit}
+          data={selectedAppointment}
+        />
+      )}
+      
+      {/* Date Filters */}
       {showFilters && (
         <View style={styles.filtersContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <TouchableOpacity 
+             <View style={{flexDirection:'row', marginBottom: 12}}>
+                 {['TODAY', 'TOMORROW', 'YESTERDAY', 'CUSTOM'].map((filter) => (
+                    <TouchableOpacity
+                        key={filter}
+                        style={[
+                            styles.filterChip,
+                            dateFilter === filter ? styles.filterChipActive : styles.filterChipInactive
+                        ]}
+                        onPress={() => {
+                            if (filter === 'CUSTOM') {
+                                setShowCustomDateModal(true);
+                            } else {
+                                setDateFilter(filter);
+                            }
+                        }}
+                    >
+                        <Text style={dateFilter === filter ? styles.filterTextActive : styles.filterTextInactive}>
+                            {filter.charAt(0) + filter.slice(1).toLowerCase()}
+                        </Text>
+                    </TouchableOpacity>
+                 ))}
+             </View>
+          {/* <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <TouchableOpacity
               style={[
-                styles.filterChip, 
-                activeFilter === 'all' ? styles.filterChipActive : styles.filterChipInactive
+                styles.filterChip,
+                activeFilter === 'all'
+                  ? styles.filterChipActive
+                  : styles.filterChipInactive,
               ]}
               onPress={() => setActiveFilter('all')}
             >
-              <Text style={activeFilter === 'all' ? styles.filterTextActive : styles.filterTextInactive}>
+              <Text
+                style={
+                  activeFilter === 'all'
+                    ? styles.filterTextActive
+                    : styles.filterTextInactive
+                }
+              >
                 All
               </Text>
             </TouchableOpacity>
-            
+
             {statusFilters.map((status, index) => (
-              <TouchableOpacity 
+              <TouchableOpacity
                 key={index}
                 style={[
-                  styles.filterChip, 
-                  activeFilter.toUpperCase() === status ? styles.filterChipActive : styles.filterChipInactive
+                  styles.filterChip,
+                  activeFilter.toUpperCase() === status
+                    ? styles.filterChipActive
+                    : styles.filterChipInactive,
                 ]}
                 onPress={() => setActiveFilter(status)}
               >
-                <Text 
-                  style={activeFilter.toUpperCase() === status ? styles.filterTextActive : styles.filterTextInactive}
+                <Text
+                  style={
+                    activeFilter.toUpperCase() === status
+                      ? styles.filterTextActive
+                      : styles.filterTextInactive
+                  }
                   numberOfLines={1}
                 >
                   {formatFilterText(status)}
@@ -186,140 +338,317 @@ const AppointmentsScreen = () => {
             ))}
 
             {facilities.map((facility, index) => (
-              <TouchableOpacity 
+              <TouchableOpacity
                 key={`facility-${index}`}
                 style={[
-                  styles.filterChip, 
-                  activeFilter === facility ? styles.filterChipActive : styles.filterChipInactive
+                  styles.filterChip,
+                  activeFilter === facility
+                    ? styles.filterChipActive
+                    : styles.filterChipInactive,
                 ]}
                 onPress={() => setActiveFilter(facility)}
               >
-                <Text 
-                  style={activeFilter === facility ? styles.filterTextActive : styles.filterTextInactive} 
+                <Text
+                  style={
+                    activeFilter === facility
+                      ? styles.filterTextActive
+                      : styles.filterTextInactive
+                  }
                   numberOfLines={1}
                 >
                   {facility}
                 </Text>
               </TouchableOpacity>
             ))}
-          </ScrollView>
+          </ScrollView> */}
         </View>
       )}
 
       {/* Appointments List */}
-      <ScrollView style={styles.contentScroll}>
-        {filteredAppointments.length === 0 ? (
+      <ScrollView 
+        style={styles.contentScroll}
+        refreshControl={
+          <RefreshControl refreshing={isRefetching} onRefresh={onRefresh} />
+        }
+        contentContainerStyle={{flex:filteredAppointments?.length?0:1}}
+      >
+        {isLoading ? (
           <View style={styles.emptyState}>
-            {/* <User color="#9CA3AF" size={48} /> */}
-            <Text style={styles.emptyTitle}>No appointments found</Text>
-            <Text style={styles.emptySubtitle}>Try adjusting your filters</Text>
+            <Text style={styles.emptyTitle}>Loading appointments...</Text>
           </View>
+        ) : error ? (
+          <EmptyState 
+            title="Error loading appointments"
+            description={error.message || 'Please try again later'}
+            actionLabel="Try Again"
+            onAction={onRefresh}
+            type="error"
+          />
+  ) : filteredAppointments.length === 0 ? (
+          <EmptyState 
+            title="No Appointments Found"
+            description="We couldn't find any appointments matching your current filters."
+            // actionLabel="Reset Filters"
+            // onAction={resetFilters}
+            type="search"
+          />
         ) : (
-          filteredAppointments.map((appointment) => (
-            <View 
-              key={appointment.appointmentId} 
-              style={[styles.card, shadows.sm]} 
+          filteredAppointments?.map(appointment => (
+            <View
+              key={appointment?._id}
+              style={[styles.card, shadows.sm]}
             >
               {/* Appointment Header */}
               <View style={styles.cardHeader}>
                 <View style={styles.dateRow}>
-                  {/* <Calendar color={colors.primary} size={18} /> */}
+                  <Calendar color={colors.primary} size={18} />
                   {/* USING visitDate */}
-                  <Text style={styles.dateText}>{appointment.visitDate}</Text> 
+                  <Text style={styles.dateText}>{appointment.visitDate}</Text>
                 </View>
-                <View style={[
-                  styles.statusBadge,
-                  // Simplified status mapping: Confirmed or Pending/Other
-                  appointment.status === 'CHECKED_IN' ? styles.statusConfirmed : styles.statusPending
-                ]}>
-                  <Text style={[
-                    styles.statusText,
-                    appointment.status === 'CHECKED_IN' ? styles.statusTextConfirmed : styles.statusTextPending
-                  ]}>
+                <View
+                  style={[
+                    styles.statusBadge,
+                    // Simplified status mapping: Confirmed or Pending/Other
+                    appointment.status === 'CHECKED_IN'
+                      ? styles.statusConfirmed
+                      : styles.statusPending,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.statusText,
+                      appointment.status === "CHECKED_IN"
+                        ? styles.statusTextConfirmed
+                        : styles.statusTextPending,
+                    ]}
+                  >
                     {formatFilterText(appointment.status)}
                   </Text>
                 </View>
               </View>
-              
+
               {/* Patient Info */}
-              <View style={styles.cardBody}>
+              <TouchableOpacity onPress={()=>navigation.navigate(RouterConstants.EmrGenerationScreen,{patientData:appointment})} style={styles.cardBody}>
                 <View style={styles.patientRow}>
-                  <Image 
+                  <Image
                     // Using a mock avatar as it's not provided in the new JSON
-                    source={{ uri: appointment.patientAvatar || "https://via.placeholder.com/64" }} 
+                    source={{
+                      uri:
+                        appointment.patientAvatar ||
+                        'https://via.placeholder.com/64',
+                    }}
                     style={styles.avatar}
                   />
                   <View style={styles.patientInfo}>
                     {/* USING patientName */}
-                    <Text style={styles.patientName}>{appointment.patientName}</Text> 
+                    <Text style={styles.patientName}>
+                      {appointment.patientName}
+                    </Text>
                     <View style={styles.infoRow}>
-                      {/* <MapPin color={colors.textTertiary} size={14} /> */}
+                      <MapPin color={colors.textTertiary} size={14} />
                       {/* USING doctorName as facility */}
-                      <Text style={styles.infoText}>Doctor: {appointment.doctorName}</Text> 
+                      <Text style={styles.infoText}>
+                        Doctor: {appointment.doctorName}
+                      </Text>
                     </View>
                     <View style={styles.infoRow}>
-                      {/* <Clock color={colors.textTertiary} size={14} /> */}
+                      <Clock color={colors.textTertiary} size={14} />
                       {/* USING scheduledTime */}
-                      <Text style={styles.infoText}>Time: {appointment.scheduledTime}</Text> 
+                      <Text style={styles.infoText}>
+                        Time: {appointment.scheduledTime}
+                      </Text>
                     </View>
                   </View>
                 </View>
-                
+
                 <View style={styles.detailsContainer}>
                   <Text style={styles.label}>Encounter ID:</Text>
                   <Text style={styles.value}>{appointment.encounterId}</Text>
-                  
+
                   {/* Using original reason/notes for context, since new JSON lacks them */}
-                  <Text style={[styles.label, styles.marginTop]}>Reason:</Text>
-                  <Text style={styles.value}>{appointment.reason || "N/A"}</Text> 
+                  <Text style={[styles.label, styles.marginTop]}>Details:</Text>
+                  <Text style={styles.value}>
+                    {appointment?.patientAge} • {appointment?.patientGender}
+                  </Text>
 
                   <View style={styles.marginTop}>
                     <Text style={styles.label}>Type:</Text>
                     <View style={styles.typeBadge}>
-                      <Text style={styles.typeText}>{appointment.appointmentType}</Text>
+                      <Text style={styles.typeText}>
+                        {appointment.appointmentType}
+                      </Text>
                     </View>
                   </View>
                 </View>
-                
+
                 {/* Action Buttons */}
-                <View style={styles.actionsRow}>
-                  <TouchableOpacity style={[styles.actionButton, styles.actionBtnSuccess]}>
-                    {/* <CheckCircle color="#4CAF50" size={20} /> */}
+                {/* <View style={styles.actionsRow}>
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.actionBtnSuccess]}
+                    onPress={() => {
+                      setSelectedAppointment(appointment);
+                      setVisible(true);
+                    }}
+                  >
+                    <CheckCircle color="#4CAF50" size={20} />
                     <Text style={styles.actionBtnTextSuccess}>Check-in</Text>
                   </TouchableOpacity>
-                  
-                  <TouchableOpacity style={[styles.actionButton, styles.actionBtnInfo]}>
-                    {/* <CalendarClock color={colors.primary} size={20} /> */}
+
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.actionBtnInfo]}
+                  >
+                    <CalendarClock color={colors.primary} size={20} />
                     <Text style={styles.actionBtnTextInfo}>Reschedule</Text>
                   </TouchableOpacity>
-                  
-                  <TouchableOpacity style={[styles.actionButton, styles.actionBtnError]}>
-                    {/* <XCircle color={colors.error} size={20} /> */}
+
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.actionBtnError]}
+                  >
+                    <XCircle color={colors.error} size={20} />
                     <Text style={styles.actionBtnTextError}>Cancel</Text>
                   </TouchableOpacity>
-                </View>
-              </View>
+                </View> */}
+              </TouchableOpacity>
             </View>
           ))
         )}
       </ScrollView>
+      {showCustomDateModal && (
+  <View style={styles.modalOverlay}>
+    <View style={styles.dateModal}>
+      <Text style={styles.modalTitle}>Select Date Range</Text>
+
+      {/* DateTimePicker inside modal */}
+      {showPicker.show && (
+        <DateTimePicker
+          value={
+            new Date(
+              showPicker.type === 'start'
+                ? tempDateRange.start || new Date()
+                : tempDateRange.end || new Date()
+            )
+          }
+          mode="date"
+          display={Platform.OS === "ios" ? "spinner" : "default"}
+          onChange={onDateChange}
+          minimumDate={
+            showPicker.type === 'end' && tempDateRange.start
+              ? new Date(tempDateRange.start)
+              : undefined
+          }
+          maximumDate={
+            showPicker.type === 'start' && tempDateRange.end
+              ? new Date(tempDateRange.end)
+              : undefined
+          }
+          style={{ height: Platform.OS === 'ios' ? 220 : undefined }}
+        />
+      )}
+
+      <Text style={styles.modalLabel}>Start Date</Text>
+      <TouchableOpacity
+        style={styles.datePickerButton}
+        onPress={() =>
+          setShowPicker({ show: true, mode: 'date', type: 'start' })
+        }
+      >
+        <Text style={styles.datePickerText}>
+          {tempDateRange.start || 'Select Start Date'}
+        </Text>
+        <Calendar size={20} color={colors.gray500} />
+      </TouchableOpacity>
+
+      <Text style={styles.modalLabel}>End Date</Text>
+      <TouchableOpacity
+        style={styles.datePickerButton}
+        onPress={() =>
+          setShowPicker({ show: true, mode: 'date', type: 'end' })
+        }
+      >
+        <Text style={styles.datePickerText}>
+          {tempDateRange.end || 'Select End Date'}
+        </Text>
+        <Calendar size={20} color={colors.gray500} />
+      </TouchableOpacity>
+
+      <View style={styles.modalActions}>
+        <TouchableOpacity onPress={() => setShowCustomDateModal(false)}>
+          <Text style={styles.modalCancelText}>Cancel</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={handleCustomDateSubmit} style={styles.modalConfirm}>
+          <Text style={styles.modalConfirmText}>Apply</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+)}
+
     </View>
   );
 };
+      // {/* Custom Date Modal */}
+      // <>
+      // {showCustomDateModal && (
+      //   <View style={styles.modalOverlay}>
+      //     {showPicker.show && (
+      //               <DateTimePicker
+      //                   value={new Date(showPicker.type === 'start' ? (tempDateRange.start || new Date()) : (tempDateRange.end || new Date()))}
+      //                   mode="date"
+      //                   display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+      //                   onChange={onDateChange}
+      //                   minimumDate={showPicker.type === 'end' && tempDateRange.start ? new Date(tempDateRange.start) : undefined}
+      //                   maximumDate={showPicker.type === 'start' && tempDateRange.end ? new Date(tempDateRange.end) : undefined}
+      //               />
+      //           )}
+      //       <View style={styles.dateModal}>
+      //           <Text style={styles.modalTitle}>Select Date Range</Text>
+                
+      //           <Text style={styles.modalLabel}>Start Date</Text>
+      //           <TouchableOpacity 
+      //               style={styles.datePickerButton} 
+      //               onPress={() => setShowPicker({ show: true, mode: 'date', type: 'start' })}
+      //           >
+      //               <Text style={styles.datePickerText}>{tempDateRange.start || 'Select Start Date'}</Text>
+      //               <Calendar size={20} color={colors.gray500} />
+      //           </TouchableOpacity>
+
+      //            <Text style={styles.modalLabel}>End Date</Text>
+      //            <TouchableOpacity 
+      //               style={styles.datePickerButton} 
+      //               onPress={() => setShowPicker({ show: true, mode: 'date', type: 'end' })}
+      //           >
+      //               <Text style={styles.datePickerText}>{tempDateRange.end || 'Select End Date'}</Text>
+      //               <Calendar size={20} color={colors.gray500} />
+      //           </TouchableOpacity>
+
+      //           <View style={styles.modalActions}>
+      //               <TouchableOpacity onPress={() => setShowCustomDateModal(false)} style={styles.modalCancel}>
+      //                   <Text style={styles.modalCancelText}>Cancel</Text>
+      //               </TouchableOpacity>
+      //               <TouchableOpacity onPress={handleCustomDateSubmit} style={styles.modalConfirm}>
+      //                   <Text style={styles.modalConfirmText}>Apply</Text>
+      //               </TouchableOpacity>
+      //           </View>
+      //           {/* Close button for iOS Picker if needed, or just rely on Apply/Cancel to close modal which is fine for inline */}
+      //       </View>
+      //   </View>
+      // )}
+      // </>
 
 // --- STYLES REMAINING UNCHANGED ---
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.gray100, 
+    backgroundColor: colors.gray100,
   },
-  
+
   // Header
   header: {
-    backgroundColor: colors.primary, 
-    paddingTop: spacing.xxl, 
-    paddingBottom: spacing.lg, 
-    paddingHorizontal: spacing.md, 
+    backgroundColor: colors.primary,
+    paddingTop: spacing.xxl,
+    paddingBottom: spacing.lg,
+    paddingHorizontal: spacing.md,
   },
   headerTop: {
     flexDirection: 'row',
@@ -328,7 +657,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: colors.white,
-    ...typography.h3, 
+    ...typography.h3,
     fontWeight: '700',
   },
   filterButton: {
@@ -343,20 +672,21 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: radius.full,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs, 
+    paddingVertical: spacing.xs,
   },
   searchInput: {
     flex: 1,
     marginLeft: spacing.sm,
     color: colors.white,
-    height: 40, 
+    height: 40,
+    // textAlign:'center'
   },
 
   // Filters
   filtersContainer: {
     backgroundColor: colors.white,
     paddingHorizontal: spacing.md,
-    paddingVertical: 12, 
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray100,
   },
@@ -367,17 +697,17 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
   },
   filterChipActive: {
-    backgroundColor: colors.primaryLight, 
+    backgroundColor: colors.primaryLight,
   },
   filterChipInactive: {
-    backgroundColor: colors.gray100, 
+    backgroundColor: colors.gray100,
   },
   filterTextActive: {
-    color: colors.primary, 
+    color: colors.primary,
     fontWeight: '500',
   },
   filterTextInactive: {
-    color: colors.gray500, 
+    color: colors.gray500,
     fontWeight: '500',
   },
 
@@ -391,7 +721,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 48, 
+    // marginTop: 48,
   },
   emptyTitle: {
     color: colors.gray500,
@@ -415,9 +745,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: spacing.md,
-    backgroundColor: colors.gray100, 
+    backgroundColor: colors.gray100,
     borderBottomWidth: 1,
-    borderBottomColor: colors.gray200, 
+    borderBottomColor: colors.gray200,
   },
   dateRow: {
     flexDirection: 'row',
@@ -443,10 +773,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   statusTextConfirmed: {
-    color: '#166534', 
+    color: '#166534',
   },
   statusTextPending: {
-    color: '#854D0E', 
+    color: '#854D0E',
   },
 
   // Card Body
@@ -457,8 +787,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   avatar: {
-    width: 64, 
-    height: 64, 
+    width: 64,
+    height: 64,
     borderRadius: radius.full,
   },
   patientInfo: {
@@ -510,7 +840,7 @@ const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: 'row',
     marginTop: spacing.md,
-    gap: 8, 
+    gap: 8,
   },
   actionButton: {
     flex: 1,
@@ -521,29 +851,102 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   actionBtnSuccess: {
-    backgroundColor: '#DCFCE7', 
+    backgroundColor: '#DCFCE7',
   },
   actionBtnInfo: {
-    backgroundColor: colors.primaryLight, 
+    backgroundColor: colors.primaryLight,
   },
   actionBtnError: {
-    backgroundColor: '#FEE2E2', 
+    backgroundColor: '#FEE2E2',
   },
   actionBtnTextSuccess: {
-    color: '#166534', 
+    color: '#166534',
     fontWeight: '600',
     marginLeft: spacing.sm,
   },
   actionBtnTextInfo: {
-    color: colors.primaryDark, 
+    color: colors.primaryDark,
     fontWeight: '600',
     marginLeft: spacing.sm,
   },
   actionBtnTextError: {
-    color: '#991B1B', 
+    color: '#991B1B',
     fontWeight: '600',
     marginLeft: spacing.sm,
   },
+  // Modal Styles
+  modalOverlay: {
+    position: 'absolute',
+    top: 0, 
+    left: 0, 
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000
+  },
+  dateModal: {
+    backgroundColor: colors.white,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
+    width: '85%'
+  },
+  modalTitle: {
+    ...typography.h3,
+    marginBottom: spacing.md,
+    textAlign: 'center'
+  },
+  modalLabel: {
+    ...typography.bodyBold,
+    marginBottom: 4,
+    marginTop: 8
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    fontSize: 16
+  },
+  datePickerButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    backgroundColor: colors.gray100
+  },
+  datePickerText: {
+    fontSize: 16,
+    color: colors.text
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems:'center',
+    marginTop: spacing.lg,
+    gap: 18
+  },
+  modalCancel: {
+    padding: spacing.sm,
+  },
+  modalCancelText: {
+    color: colors.gray500,
+    fontWeight: '600'
+  },
+  modalConfirm: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md
+  },
+  modalConfirmText: {
+    color: colors.white,
+    fontWeight: '600'
+  }
 });
 
 export default AppointmentsScreen;

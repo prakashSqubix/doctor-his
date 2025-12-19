@@ -14,8 +14,10 @@ axiosInstance.interceptors.request.use(
   async (config) => {
     try {
       const token = await AsyncStorage.getItem('accessToken');
+      console.log('Token from AsyncStorage:', token ? 'Token found' : 'No token found');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
+        console.log('Authorization header set:', config.headers.Authorization);
       }
     } catch (error) {
       console.error('Error getting token from storage:', error);
