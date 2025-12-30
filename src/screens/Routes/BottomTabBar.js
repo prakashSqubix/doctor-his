@@ -9,6 +9,9 @@ import AppointmentScreen from '../appointment/AppointmentScreen';
 import DashboardScreen from '../dashboard/DashboardScreen';
 import PatientScreen from '../patient/PatientScreen';
 import ProfileScreen from '../profile/ProfileScreen';
+import PatientHistory from '../emr/PatientHistory';
+
+
 import {
   UnselectDashboard,
   UnselectAppointment,
@@ -76,9 +79,9 @@ const BottomTabBar = () => {
             ),
           })}
         />
-        <Tab.Screen
-          name={RouterConstants.PatientScreen}
-          component={PatientScreen}
+        {/* <Tab.Screen
+          name={RouterConstants.PatientHistory}
+          component={PatientHistory}
           options={() => ({
             unmountOnBlur: true,
             tabBarIcon: ({ focused }) => (
@@ -93,7 +96,7 @@ const BottomTabBar = () => {
               </View>
             ),
           })}
-        />
+        /> */}
         <Tab.Screen
           name={RouterConstants.AppointmentScreen}
           component={AppointmentScreen}
@@ -112,7 +115,7 @@ const BottomTabBar = () => {
             ),
           })}
         />
-        <Tab.Screen
+        {/* <Tab.Screen
           name={RouterConstants.ProfileScreen}
           component={ProfileScreen}
           options={() => ({
@@ -129,7 +132,7 @@ const BottomTabBar = () => {
               </View>
             ),
           })}
-        />
+        /> */}
       </Tab.Navigator>
     </>
   );

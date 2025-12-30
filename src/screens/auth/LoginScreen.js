@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,23 +7,89 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Dimensions,
+  Image,
+  Animated
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { TextInput, Button } from '../../components';
 import { colors, spacing, typography, radius } from '../../Constants/theme';
 import { useLoginMutation } from '../../hooks/useAuth';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const { width } = Dimensions.get('window');
+
+const CAROUSEL_DATA = [
+  {
+    id: 1,
+    title: 'Secure Healthcare Data',
+    description: 'Advanced encryption for patient privacy and data security.',
+    image: require('../../assets/images/secure_login.png'), 
+  },
+  {
+    id: 2,
+    title: 'Easy Hospital Management',
+    description: 'Streamline operations with our intuitive management tools.',
+    image: require('../../assets/images/easy_management.png'),
+  },
+  {
+    id: 3,
+    title: 'Real-time Medical Analytics',
+    description: 'Track patient vitals and health metrics instantly.',
+    image: require('../../assets/images/analytics.png'),
+  },
+];
+
+const CarouselItem = ({ item }) => {
+  return (
+    <View style={styles.carouselItem}>
+      <Image source={item.image} style={styles.carouselImage} resizeMode="contain" />
+      <View style={styles.carouselTextContainer}>
+        <Text style={styles.carouselTitle}>{item.title}</Text>
+        <Text style={styles.carouselDesc}>{item.description}</Text>
+      </View>
+    </View>
+  );
+};
 
 export default function LoginScreen() {
   const navigation = useNavigation();
-  const [email, setEmail] = useState('milan.mohapatra@squbix.com');
-  const [password, setPassword] = useState('Milan@123');
-  // const [email, setEmail] = useState('deepak.senapati@squbix.com');
-  // const [password, setPassword] = useState('99999999');
+  const insets = useSafeAreaInsets();
+  // const [email, setEmail] = useState('milan.mohapatra@squbix.com');
+  // const [password, setPassword] = useState('Milan@123');
+  const [email, setEmail] = useState('deepak.senapati@squbix.com');
+  const [password, setPassword] = useState('99999999');
   const [errors, setErrors] = useState({});
   
   const { error: authError } = useSelector((state) => state.auth);
   const loginMutation = useLoginMutation();
+
+  // Carousel State
+  const [activeIndex, setActiveIndex] = useState(0);
+  const scrollRef = useRef(null);
+  const scrollX = useRef(new Animated.Value(0)).current;
+
+  const handleScroll = (event) => {
+    const scrollPosition = event.nativeEvent.contentOffset.x;
+    const index = Math.round(scrollPosition / width);
+    setActiveIndex(index);
+  };
+
+  // Auto-scroll Effect
+  useEffect(() => {
+    const timer = setInterval(() => {
+        let nextIndex = activeIndex + 1;
+        if (nextIndex >= CAROUSEL_DATA.length) {
+            nextIndex = 0;
+        }
+        
+        scrollRef.current?.scrollTo({ x: nextIndex * width, animated: true });
+        setActiveIndex(nextIndex);
+    }, 3000); // Scroll every 3 seconds
+
+    return () => clearInterval(timer);
+  }, [activeIndex]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -87,20 +153,50 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
+      style={[styles.container, { paddingTop: insets.top+10 }]}
     >
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.iconCircle}>
-            {/* <MaterialIcons name="local-hospital" size={48} color={colors.primary} /> */}
-          </View>
+        {/* Carousel Section */}
+        <View style={styles.carouselContainer}>
+            <ScrollView
+                ref={scrollRef}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onScroll={handleScroll}
+                scrollEventThrottle={16}
+            >
+                {CAROUSEL_DATA.map((item) => (
+                    <CarouselItem key={item.id} item={item} />
+                ))}
+            </ScrollView>
+            
+            {/* Pagination Dots */}
+            <View style={styles.pagination}>
+                {CAROUSEL_DATA.map((_, index) => (
+                    <View
+                        key={index}
+                        style={[
+                            styles.dot,
+                            { backgroundColor: index === activeIndex ? colors.primary : colors.gray300 }
+                        ]}
+                    />
+                ))}
+            </View>
+        </View>
 
-          <Text style={[typography.h2, styles.title]}>MedCare</Text>
-          <Text style={[typography.bodySm, styles.subtitle]}>Doctor Portal</Text>
+        {/* Header - Simplified as main branding is in carousel now */}
+        <View style={styles.header}>
+            {/* Keeping the circle icon if desired, or removing it since carousel has images */}
+            {/* <View style={styles.iconCircle}>
+                 <MaterialIcons name="local-hospital" size={48} color={colors.primary} />
+            </View> */}
+
+          <Text style={[typography.h2, styles.title]}>Login</Text>
+          {/* <Text style={[typography.bodySm, styles.subtitle]}>Doctor Portal</Text> */}
         </View>
 
         {/* Form */}
@@ -166,13 +262,65 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.xxl,
+    // justifyContent: 'space-between', // Changed to standard flow
+    paddingBottom: spacing.xxl,
   },
+  
+  // Carousel Styles
+  carouselContainer: {
+    height: 300, 
+    marginBottom: spacing.lg,
+    backgroundColor: '#fff', // Light background for carousel area
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    overflow: 'hidden',
+  },
+  carouselItem: {
+    width: width,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  carouselImage: {
+    width: width * 0.7,
+    height: 180,
+    marginBottom: spacing.md,
+  },
+  carouselTextContainer: {
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  carouselTitle: {
+    ...typography.h4,
+    color: colors.primary,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: spacing.xs,
+  },
+  carouselDesc: {
+    ...typography.bodySm,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  pagination: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'absolute',
+    bottom: 15,
+    width: '100%',
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 4,
+  },
+
   header: {
     alignItems: 'center',
-    marginBottom: spacing.xxl,
+    marginBottom: spacing.xl,
+    // marginTop: spacing.md,
   },
   iconCircle: {
     width: 80,
@@ -192,6 +340,7 @@ const styles = StyleSheet.create({
   },
   form: {
     width: '100%',
+    paddingHorizontal: spacing.lg, // Added padding here as it was removed from scrollContent
   },
   input: {
     marginBottom: spacing.lg,
@@ -207,6 +356,8 @@ const styles = StyleSheet.create({
     marginVertical: spacing.lg,
     borderLeftWidth: 4,
     borderLeftColor: colors.primary,
+    paddingHorizontal: spacing.lg,
+    marginHorizontal: spacing.lg,
   },
   demoTitle: {
     color: colors.primary,

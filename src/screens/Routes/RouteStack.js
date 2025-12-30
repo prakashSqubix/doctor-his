@@ -9,6 +9,7 @@ import DashboardScreen from '../dashboard/DashboardScreen';
 import BottomTabBar from './BottomTabBar';
 import EMRGenerationScreen from '../emr/EmrGenerationScreen';
 import PatientDetailsScreen from '../patient/PatientDetailsScreen';
+import PatientHistory from '../emr/PatientHistory';
 
 
 const Stack = createStackNavigator();
@@ -25,6 +26,7 @@ function RouteStack() {
       <Stack.Screen name={RouterConstants.DashboardScreen} component={BottomTabBar} />
       <Stack.Screen name={RouterConstants.EmrGenerationScreen} component={EMRGenerationScreen} />
       <Stack.Screen name={RouterConstants.PatientDetailsScreen} component={PatientDetailsScreen} />
+      <Stack.Screen name={RouterConstants.PatientHistory} component={PatientHistory} />
     </Stack.Navigator>
   );
 }

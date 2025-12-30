@@ -15,6 +15,7 @@ export const API_CONFIG = {
     
     //emr
     VISIT_LIST: '/emr/visit-list',
+    VISIT_HISTORY: '/emr/visit-history',
     VISIT_COMPLETED: '/emr/check-in',
     SAVE_EMR_DATA: '/emr/save-emr-data',
 

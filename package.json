@@ -8,7 +8,8 @@
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest",
-    "tron": "adb reverse tcp:9090 tcp:9090"
+    "tron": "adb reverse tcp:9090 tcp:9090",
+     "apk-build": "cd android && ./gradlew clean && rm -rf .gradle && ./gradlew assembleRelease"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

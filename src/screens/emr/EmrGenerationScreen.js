@@ -31,9 +31,11 @@ import { useAiTranscriptionMutation, useSaveEmrDataMutation } from '../../hooks/
 import { 
   Mic, MicOff, ChevronLeft, Trash2, Activity, Edit3, CheckCircle, Clock, FileText, 
   Shield, Info, Loader, Hash, Calendar, Zap, List, Plus, X,
-  ChevronDown
+  ChevronDown,
+  History
 } from 'lucide-react-native';
 import { useSelector } from 'react-redux';
+import RouterConstants from '../../Constants/RouterConstants';
 
 const DURATION_TYPES = ['days', 'weeks', 'months', 'years'];
 const SEVERITY_TYPES = ['Mild', 'Moderate', 'Severe'];
@@ -314,7 +316,7 @@ const EMRGenerationScreen = () => {
     setModalState(null);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     // Helper to parser integer or float
     const parseNumber = (val) => {
         if (!val) return 0;
@@ -338,7 +340,7 @@ const EMRGenerationScreen = () => {
         duration: parseNumber(c.duration),
         // user might leave severity empty, ensure it's a string if needed
         severity: c.severity || 'Mild',
-        durationType: c.durationType+'s' || 'days', 
+        durationType: c.durationType || 'days', 
     }));
 
     const finalJSON = {
@@ -357,15 +359,26 @@ const EMRGenerationScreen = () => {
         instructions: [{ generalInstructions: formText.instructions || "" }] 
     };
 
-    mutateAsync({
-      'registrationId':patientData?.registrationId,
-      visitId:patientData?.visitId,
-      facilityId:user?.facility?.facilityId,
-      emrData : {...finalJSON}
-    })
+    try {
+      const response = await mutateAsync({
+        'registrationId': patientData?.registrationId,
+        visitId: patientData?.visitId,
+        facilityId: user?.facility?.facilityId,
+        emrData : {...finalJSON}
+      });
 
-    console.log("FINAL JSON SUBMISSION:", JSON.stringify(finalJSON, null, 2));
-    Alert.alert('Success', 'EMR Saved successfully.');
+      console.log("FINAL JSON SUBMISSION:", JSON.stringify(finalJSON, null, 2));
+
+      if (response && response.statusCode === 200) {
+        Alert.alert('Success', response.message || 'EMR Saved successfully.');
+        navigation.navigate('Dashboard'); 
+      } else {
+        Alert.alert('Error', response?.message || 'Failed to save EMR data.');
+      }
+    } catch (error) {
+      console.error("EMR Save Error:", error);
+      Alert.alert('Error', error.message || 'An error occurred while saving EMR.');
+    }
   };
 
   // --- REUSABLE COMPONENTS ---
@@ -894,10 +907,13 @@ const EMRGenerationScreen = () => {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <ChevronLeft size={24} color={colors.white} />
           </TouchableOpacity>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle}>EMR</Text>
             <Text style={styles.headerSubtitle}>{patientData?.patientName || 'Patient EMR'}</Text>
           </View>
+          <TouchableOpacity onPress={()=>navigation.navigate(RouterConstants.PatientHistory,{patientData})}>
+            <History size={24} color={colors.white} />
+          </TouchableOpacity>
         </View>
       </View>
 

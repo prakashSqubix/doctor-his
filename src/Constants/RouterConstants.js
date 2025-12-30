@@ -9,6 +9,7 @@ const RouterConstants = {
   ProfileScreen: 'ProfileScreen',
   EmrGenerationScreen: 'EmrGenerationScreen',
   PatientDetailsScreen: 'PatientDetailsScreen',
+  PatientHistory: 'PatientHistory',
 };
 
 export default RouterConstants;

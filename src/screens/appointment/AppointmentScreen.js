@@ -140,7 +140,6 @@ const AppointmentsScreen = () => {
   const {mutate,data:confirmationRes ,isLoading:confirmationLoading ,error:confirmationError,  } = useVisitCompleteMutation()
  
   const insets = useSafeAreaInsets();
- console.log('checkinnn',confirmationRes,confirmationLoading,confirmationError);
  
  const resetFilters = () => {
     setActiveFilter('all');
@@ -167,15 +166,16 @@ const AppointmentsScreen = () => {
   // Transform API data to match expected format or use mock data
   const appointments = React.useMemo(() => {
     if (apiData?.data?.data && Array.isArray(apiData?.data?.data)) {
-      return apiData?.data?.data?.map(visit => ({
-        
-        patientAvatar: `https://images.unsplash.com/photo-${
-          Math.random() > 0.5
-            ? '1527980965255-d3b416303d12'
-            : '1494790108377-be9c29b29330'
-        }?w=900`,
-        ...visit
-      }));
+      return apiData?.data?.data
+        .filter(visit => visit.status === 'CHECKED_IN')
+        .map(visit => ({
+          patientAvatar: `https://images.unsplash.com/photo-${
+            Math.random() > 0.5
+              ? '1527980965255-d3b416303d12'
+              : '1494790108377-be9c29b29330'
+          }?w=900`,
+          ...visit
+        }));
     }
     return [];
   }, [apiData]);
@@ -370,7 +370,7 @@ const AppointmentsScreen = () => {
         refreshControl={
           <RefreshControl refreshing={isRefetching} onRefresh={onRefresh} />
         }
-        contentContainerStyle={{flex:filteredAppointments?.length?0:1}}
+        contentContainerStyle={{flexGrow: 1}}
       >
         {isLoading ? (
           <View style={styles.emptyState}>
@@ -394,122 +394,81 @@ const AppointmentsScreen = () => {
           />
         ) : (
           filteredAppointments?.map(appointment => (
-            <View
-              key={appointment?._id}
-              style={[styles.card, shadows.sm]}
-            >
-              {/* Appointment Header */}
-              <View style={styles.cardHeader}>
-                <View style={styles.dateRow}>
-                  <Calendar color={colors.primary} size={18} />
-                  {/* USING visitDate */}
-                  <Text style={styles.dateText}>{appointment.visitDate}</Text>
-                </View>
-                <View
-                  style={[
-                    styles.statusBadge,
-                    // Simplified status mapping: Confirmed or Pending/Other
-                    appointment.status === 'CHECKED_IN'
-                      ? styles.statusConfirmed
-                      : styles.statusPending,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.statusText,
-                      appointment.status === "CHECKED_IN"
-                        ? styles.statusTextConfirmed
-                        : styles.statusTextPending,
-                    ]}
-                  >
-                    {formatFilterText(appointment.status)}
-                  </Text>
-                </View>
-              </View>
+            <View key={appointment?._id} style={styles.modernCard}>
+  {/* Status Accent Bar */}
+  <View 
+    style={[
+      styles.statusAccent, 
+      { backgroundColor: appointment.status === 'CHECKED_IN' ? '#10B981' : '#F59E0B' }
+    ]} 
+  />
 
-              {/* Patient Info */}
-              <TouchableOpacity onPress={()=>navigation.navigate(RouterConstants.EmrGenerationScreen,{patientData:appointment})} style={styles.cardBody}>
-                <View style={styles.patientRow}>
-                  <Image
-                    // Using a mock avatar as it's not provided in the new JSON
-                    source={{
-                      uri:
-                        appointment.patientAvatar ||
-                        'https://via.placeholder.com/64',
-                    }}
-                    style={styles.avatar}
-                  />
-                  <View style={styles.patientInfo}>
-                    {/* USING patientName */}
-                    <Text style={styles.patientName}>
-                      {appointment.patientName}
-                    </Text>
-                    <View style={styles.infoRow}>
-                      <MapPin color={colors.textTertiary} size={14} />
-                      {/* USING doctorName as facility */}
-                      <Text style={styles.infoText}>
-                        Doctor: {appointment.doctorName}
-                      </Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                      <Clock color={colors.textTertiary} size={14} />
-                      {/* USING scheduledTime */}
-                      <Text style={styles.infoText}>
-                        Time: {appointment.scheduledTime}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
+  <TouchableOpacity 
+    onPress={() => navigation.navigate(RouterConstants.EmrGenerationScreen, { patientData: appointment })}
+    style={styles.cardContent}
+    activeOpacity={0.7}
+  >
+    {/* Top Row: Date & Status */}
+    <View style={styles.headerRow}>
+      <View style={styles.dateTimeBadge}>
+        <Calendar color={colors.primary} size={14} />
+        <Text style={styles.headerDateText}>{appointment.visitDate}</Text>
+        <View style={styles.dotSeparator} />
+        <Clock color={colors.primary} size={14} />
+        <Text style={styles.headerDateText}>{appointment.scheduledTime}</Text>
+      </View>
+      
+      <View style={[
+        styles.statusPill,
+        appointment.status === 'CHECKED_IN' ? styles.pillSuccess : styles.pillWarning
+      ]}>
+        <Text style={[
+          styles.statusPillText,
+          appointment.status === 'CHECKED_IN' ? styles.textSuccess : styles.textWarning
+        ]}>
+          {formatFilterText(appointment.status)}
+        </Text>
+      </View>
+    </View>
 
-                <View style={styles.detailsContainer}>
-                  <Text style={styles.label}>Encounter ID:</Text>
-                  <Text style={styles.value}>{appointment.encounterId}</Text>
+    {/* Patient Profile Row */}
+    <View style={styles.profileSection}>
+      <View style={styles.avatarCircle}>
+        <Text style={styles.avatarText}>
+          {appointment.patientName?.charAt(0).toUpperCase()}
+        </Text>
+      </View>
+      
+      <View style={styles.mainInfo}>
+        <Text style={styles.patientNameModern}>{appointment.patientName}</Text>
+        <View style={styles.doctorRow}>
+          <View style={styles.iconCircle}>
+             <MapPin color={colors.primary} size={12} />
+          </View>
+          <Text style={styles.doctorNameText}>Dr. {appointment.doctorName}</Text>
+        </View>
+      </View>
+    </View>
 
-                  {/* Using original reason/notes for context, since new JSON lacks them */}
-                  <Text style={[styles.label, styles.marginTop]}>Details:</Text>
-                  <Text style={styles.value}>
-                    {appointment?.patientAge} • {appointment?.patientGender}
-                  </Text>
-
-                  <View style={styles.marginTop}>
-                    <Text style={styles.label}>Type:</Text>
-                    <View style={styles.typeBadge}>
-                      <Text style={styles.typeText}>
-                        {appointment.appointmentType}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-
-                {/* Action Buttons */}
-                {/* <View style={styles.actionsRow}>
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.actionBtnSuccess]}
-                    onPress={() => {
-                      setSelectedAppointment(appointment);
-                      setVisible(true);
-                    }}
-                  >
-                    <CheckCircle color="#4CAF50" size={20} />
-                    <Text style={styles.actionBtnTextSuccess}>Check-in</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.actionBtnInfo]}
-                  >
-                    <CalendarClock color={colors.primary} size={20} />
-                    <Text style={styles.actionBtnTextInfo}>Reschedule</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.actionBtnError]}
-                  >
-                    <XCircle color={colors.error} size={20} />
-                    <Text style={styles.actionBtnTextError}>Cancel</Text>
-                  </TouchableOpacity>
-                </View> */}
-              </TouchableOpacity>
-            </View>
+    {/* Metadata Grid */}
+    <View style={styles.metaGrid}>
+      <View style={styles.metaItem}>
+        <Text style={styles.metaLabel}>ENCOUNTER ID</Text>
+        <Text style={styles.metaValue}>#{appointment.encounterId}</Text>
+      </View>
+      <View style={styles.metaItem}>
+        <Text style={styles.metaLabel}>PATIENT DETAILS</Text>
+        <Text style={styles.metaValue}>{appointment?.patientAge} • {appointment?.patientGender}</Text>
+      </View>
+      <View style={styles.metaItem}>
+        <Text style={styles.metaLabel}>APPOINTMENT TYPE</Text>
+        <View style={styles.typeTag}>
+          <Text style={styles.typeTagText}>{appointment.appointmentType}</Text>
+        </View>
+      </View>
+    </View>
+  </TouchableOpacity>
+</View>
           ))
         )}
       </ScrollView>
@@ -600,7 +559,7 @@ const AppointmentsScreen = () => {
       //                   minimumDate={showPicker.type === 'end' && tempDateRange.start ? new Date(tempDateRange.start) : undefined}
       //                   maximumDate={showPicker.type === 'start' && tempDateRange.end ? new Date(tempDateRange.end) : undefined}
       //               />
-      //           )}
+      //       )}
       //       <View style={styles.dateModal}>
       //           <Text style={styles.modalTitle}>Select Date Range</Text>
                 
@@ -786,13 +745,13 @@ const styles = StyleSheet.create({
   patientRow: {
     flexDirection: 'row',
   },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: radius.full,
-  },
+  // avatar: {   // REMOVED
+  //   width: 64,
+  //   height: 64,
+  //   borderRadius: radius.full,
+  // },
   patientInfo: {
-    marginLeft: spacing.md,
+    // marginLeft: spacing.md, // REMOVED MARGIN
     flex: 1,
   },
   patientName: {
@@ -946,6 +905,141 @@ const styles = StyleSheet.create({
   modalConfirmText: {
     color: colors.white,
     fontWeight: '600'
+  },
+  modernCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    marginBottom: 16,
+    flexDirection: 'row',
+    overflow: 'hidden',
+    // Elegant soft shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  statusAccent: {
+    width: 6,
+    height: '100%',
+  },
+  cardContent: {
+    flex: 1,
+    padding: 16,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  dateTimeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  headerDateText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+    marginLeft: 4,
+  },
+  dotSeparator: {
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: '#CBD5E1',
+    marginHorizontal: 8,
+  },
+  statusPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  pillSuccess: { backgroundColor: '#ECFDF5' },
+  pillWarning: { backgroundColor: '#FFFBEB' },
+  statusPillText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  textSuccess: { color: '#059669' },
+  textWarning: { color: '#D97706' },
+
+  profileSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  avatarCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
+  },
+  avatarText: {
+    color: '#4F46E5',
+    fontWeight: '700',
+    fontSize: 18,
+  },
+  mainInfo: {
+    marginLeft: 14,
+    flex: 1,
+  },
+  patientNameModern: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1E293B',
+    marginBottom: 2,
+  },
+  doctorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  doctorNameText: {
+    fontSize: 13,
+    color: '#64748B',
+    marginLeft: 4,
+  },
+  metaGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    paddingTop: 14,
+    gap: 12,
+  },
+  metaItem: {
+    minWidth: '45%',
+  },
+  metaLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#94A3B8',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  metaValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  typeTag: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  typeTagText: {
+    fontSize: 11,
+    color: '#475569',
+    fontWeight: '600',
   }
 });
 

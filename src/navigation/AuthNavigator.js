@@ -9,6 +9,7 @@ import BottomTabBar from '../screens/Routes/BottomTabBar';
 import EMRGenerationScreen from '../screens/emr/EmrGenerationScreen';
 import PatientDetailsScreen from '../screens/patient/PatientDetailsScreen';
 import RouterConstants from '../Constants/RouterConstants';
+import PatientHistory from '../screens/emr/PatientHistory';
 
 const Stack = createStackNavigator();
 
@@ -52,6 +53,10 @@ export default function AuthNavigator() {
             name={RouterConstants.PatientDetailsScreen} 
             component={PatientDetailsScreen} 
           />
+          <Stack.Screen 
+            name={RouterConstants.PatientHistory} 
+            component={PatientHistory} 
+          />
         </>
       ) : (
         // Authentication flow screens
@@ -79,6 +84,10 @@ export default function AuthNavigator() {
           <Stack.Screen 
             name={RouterConstants.PatientDetailsScreen} 
             component={PatientDetailsScreen} 
+          />
+          <Stack.Screen 
+            name={RouterConstants.PatientHistory} 
+            component={PatientHistory} 
           />
         </>
       )}
