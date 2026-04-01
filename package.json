@@ -9,7 +9,7 @@
     "start": "react-native start",
     "test": "jest",
     "tron": "adb reverse tcp:9090 tcp:9090",
-     "apk-build": "cd android && ./gradlew clean && rm -rf .gradle && ./gradlew assembleRelease"
+    "apk-build": "cd android && ./gradlew clean && rm -rf .gradle && ./gradlew assembleRelease"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -22,6 +22,7 @@
     "@reduxjs/toolkit": "^2.11.1",
     "@tanstack/react-query": "^5.90.12",
     "axios": "^1.13.2",
+    "crypto-js": "^4.2.0",
     "expo-asset": "^12.0.11",
     "lucide-react-native": "^0.556.0",
     "moment": "^2.30.1",

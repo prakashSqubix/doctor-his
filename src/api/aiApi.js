@@ -1,10 +1,11 @@
 import axios from 'axios';
 
 // AI API Configuration - separate from main app API
-const AI_API_CONFIG = {
+export const AI_API_CONFIG = {
   BASE_URL: 'https://ai.squbix.com',
   ENDPOINTS: {
     TRANSCRIPTION: '/conversation',
+    TRANSCRIPTION_MULTI: '/conversation/od-en',
   },
   TIMEOUT: 500000, // 30 seconds for AI processing
   HEADERS: {
@@ -23,9 +24,9 @@ const aiAxiosInstance = axios.create({
 // AI API functions
 export const aiAPI = {
   // Transcribe audio and get EMR data
-  transcribeAudio: async (base64AudioString) => {
+  transcribeAudio: async (base64AudioString, endpoint = AI_API_CONFIG.ENDPOINTS.TRANSCRIPTION) => {
     try {
-      const response = await aiAxiosInstance.post(AI_API_CONFIG.ENDPOINTS.TRANSCRIPTION, {
+      const response = await aiAxiosInstance.post(endpoint, {
         b64_str: base64AudioString,
       });
       return response.data;

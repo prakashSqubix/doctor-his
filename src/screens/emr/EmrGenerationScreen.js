@@ -28,6 +28,7 @@ import {
 import RNFS from 'react-native-fs';
 
 import { useAiTranscriptionMutation, useSaveEmrDataMutation } from '../../hooks/useEmr';
+import { AI_API_CONFIG } from '../../api/aiApi';
 import { 
   Mic, MicOff, ChevronLeft, Trash2, Activity, Edit3, CheckCircle, Clock, FileText, 
   Shield, Info, Loader, Hash, Calendar, Zap, List, Plus, X,
@@ -58,6 +59,7 @@ const EMRGenerationScreen = () => {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const [audioData, setAudioData] = useState({ data: '', isRecording: false });
+  const [selectedEndpoint, setSelectedEndpoint] = useState(AI_API_CONFIG.ENDPOINTS.TRANSCRIPTION);
   const aiTranscriptionMutation = useAiTranscriptionMutation();
   // --- Animation State ---
   const rotateAnim = useRef(new Animated.Value(0)).current;
@@ -172,7 +174,10 @@ const EMRGenerationScreen = () => {
       if (fileExists) await RNFS.unlink(filePath);
   
       try {
-        const aiResult = await aiTranscriptionMutation.mutateAsync(base64Audio);
+        const aiResult = await aiTranscriptionMutation.mutateAsync({ 
+          base64AudioString: base64Audio, 
+          endpoint: selectedEndpoint 
+        });
         
         if (aiResult) {
           setTranscript(aiResult.transcription || '');
@@ -278,8 +283,32 @@ const EMRGenerationScreen = () => {
         if (audioData.isRecording) {
             await stopRecording();
         } else {
-            setAudioData({ ...audioData, isRecording: true });
-            await Sound.startRecorder();
+            Alert.alert(
+              "Select Language",
+              "Which language option would you like to use?",
+              [
+                {
+                  text: "English Only",
+                  onPress: async () => {
+                    setSelectedEndpoint(AI_API_CONFIG.ENDPOINTS.TRANSCRIPTION);
+                    setAudioData({ ...audioData, isRecording: true });
+                    await Sound.startRecorder();
+                  }
+                },
+                {
+                  text: "Multi-language (Odia/English)",
+                  onPress: async () => {
+                    setSelectedEndpoint(AI_API_CONFIG.ENDPOINTS.TRANSCRIPTION_MULTI);
+                    setAudioData({ ...audioData, isRecording: true });
+                    await Sound.startRecorder();
+                  }
+                },
+                {
+                  text: "Cancel",
+                  style: "cancel"
+                }
+              ]
+            );
         }
     }
   };

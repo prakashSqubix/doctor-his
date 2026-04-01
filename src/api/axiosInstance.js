@@ -1,6 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_CONFIG } from '../config/api';
+import { generateHMAC } from '../utils/hmacUtils';
 
 // Create axios instance
 const axiosInstance = axios.create({
@@ -9,18 +10,41 @@ const axiosInstance = axios.create({
   headers: API_CONFIG.DEFAULT_HEADERS,
 });
 
-// Request interceptor to add auth token
+// Request interceptor to add auth token and HMAC signature
 axiosInstance.interceptors.request.use(
   async (config) => {
     try {
+      // 1. Add Auth Token
       const token = await AsyncStorage.getItem('accessToken');
-      console.log('Token from AsyncStorage:', token ? 'Token found' : 'No token found');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
-        console.log('Authorization header set:', config.headers.Authorization);
       }
+
+      // 2. Add HMAC Signature
+      const timestamp = Date.now().toString();
+      const method = config.method.toUpperCase();
+      // Remove baseURL from url if it exists to get the path
+      let path = config.url;
+      if (path.startsWith(config.baseURL)) {
+        path = path.substring(config.baseURL.length);
+      }
+      // Ensure path starts with /
+      if (!path.startsWith('/')) {
+        path = `/${path}`;
+      }
+
+      const body = config.data ? JSON.stringify(config.data) : '';
+      
+      console.log('[HMAC Debug] Signing items:', { method, path, timestamp, bodyLen: body.length });
+      
+      const signature = generateHMAC(method, path, timestamp, body);
+
+      config.headers['x-signature'] = signature;
+      config.headers['x-timestamp'] = timestamp;
+
+      console.log(`[HMAC] Signed request: ${method} ${path} | Signature: ${signature}`);
     } catch (error) {
-      console.error('Error getting token from storage:', error);
+      console.error('Error in request interceptor:', error);
     }
     return config;
   },

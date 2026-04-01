@@ -44,8 +44,8 @@ export const useVisitListMutation = () => {
 // AI Transcription mutation
 export const useAiTranscriptionMutation = () => {
   return useMutation({
-    mutationFn: async (base64AudioString) => {
-      const response = await aiAPI.transcribeAudio(base64AudioString);
+    mutationFn: async ({ base64AudioString, endpoint }) => {
+      const response = await aiAPI.transcribeAudio(base64AudioString, endpoint);
       console.log('AI Transcription Response:', response);
       return response;
     },
