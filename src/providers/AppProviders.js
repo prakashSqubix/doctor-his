@@ -28,21 +28,26 @@ const LoadingComponent = () => (
   </View>
 );
 
+import { ToastProvider } from './ToastContext';
+
 export default function AppProviders({ children }) {
   return (
     <Provider store={store}>
       <PersistGate loading={<LoadingComponent />} persistor={persistor}>
         <QueryClientProvider client={queryClient}>
           <SafeAreaProvider>
-            <NavigationContainer>
-              {children}
-            </NavigationContainer>
+            <ToastProvider>
+              <NavigationContainer>
+                {children}
+              </NavigationContainer>
+            </ToastProvider>
           </SafeAreaProvider>
         </QueryClientProvider>
       </PersistGate>
     </Provider>
   );
 }
+
 
 const styles = StyleSheet.create({
   loadingContainer: {

@@ -20,8 +20,9 @@ export default function AuthNavigator() {
   // Determine initial route based on auth state
   const getInitialRouteName = () => {
     if (isAuthenticated) {
-      return RouterConstants.DashboardScreen;
+      return RouterConstants.MainTabs;
     }
+
     
     switch (currentStep) {
       case 'TENANT_SELECTION':
@@ -42,9 +43,10 @@ export default function AuthNavigator() {
         // Authenticated screens
         <>
           <Stack.Screen 
-            name={RouterConstants.DashboardScreen} 
+            name={RouterConstants.MainTabs} 
             component={BottomTabBar} 
           />
+
           <Stack.Screen 
             name={RouterConstants.EmrGenerationScreen} 
             component={EMRGenerationScreen} 
@@ -74,9 +76,10 @@ export default function AuthNavigator() {
             component={FacilitySelectionScreen} 
           />
           <Stack.Screen 
-            name={RouterConstants.DashboardScreen} 
+            name={RouterConstants.MainTabs} 
             component={BottomTabBar} 
           />
+
           <Stack.Screen 
             name={RouterConstants.EmrGenerationScreen} 
             component={EMRGenerationScreen} 

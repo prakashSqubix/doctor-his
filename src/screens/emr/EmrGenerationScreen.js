@@ -38,6 +38,8 @@ import {
 import { useSelector } from 'react-redux';
 import RouterConstants from '../../Constants/RouterConstants';
 
+import { useToast } from '../../providers/ToastContext';
+
 const DURATION_TYPES = ['days', 'weeks', 'months', 'years'];
 const SEVERITY_TYPES = ['Mild', 'Moderate', 'Severe'];
 
@@ -57,6 +59,8 @@ const EMRGenerationScreen = () => {
   
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { showToast } = useToast();
+
   const { height } = useWindowDimensions();
   const [audioData, setAudioData] = useState({ data: '', isRecording: false });
   const [selectedEndpoint, setSelectedEndpoint] = useState(AI_API_CONFIG.ENDPOINTS.TRANSCRIPTION);
@@ -136,7 +140,8 @@ const EMRGenerationScreen = () => {
   const startRecording = useCallback(async () => {
     const hasPermission = await checkPermissions();
     if (!hasPermission) {
-      Alert.alert("Permission Denied", "Microphone access is required for recording.");
+      showToast("Microphone access is required for recording.", "warning");
+
       return;
     }
 
@@ -155,7 +160,8 @@ const EMRGenerationScreen = () => {
       setIsRecording(true);
       setTranscript('Listening... Speak clearly. Tap the mic to stop.');
     } catch (error) {
-      Alert.alert("Recording Error", `Failed to start recording: ${error.message}`);
+      showToast(`Failed to start recording: ${error.message}`, "error");
+
       setIsRecording(false);
     }
   }, [checkPermissions]);
@@ -257,14 +263,16 @@ const EMRGenerationScreen = () => {
         });
 
         setIsProcessing(false);
-        Alert.alert("Transcription Complete", "EMR fields populated from transcription.");
+        showToast("EMR fields populated from transcription.", "success");
+
 
         // Clean up audio file (Mocked)
         // await RNFS.unlink(audioPath); 
       }, 3000);
 
     } catch (error) {
-      Alert.alert("Recording Error", `Failed to stop recording: ${error.message}`);
+      showToast(`Failed to stop recording: ${error.message}`, "error");
+
       setIsRecording(false);
       setIsProcessing(false);
     }
@@ -399,14 +407,18 @@ const EMRGenerationScreen = () => {
       console.log("FINAL JSON SUBMISSION:", JSON.stringify(finalJSON, null, 2));
 
       if (response && response.statusCode === 200) {
-        Alert.alert('Success', response.message || 'EMR Saved successfully.');
-        navigation.navigate('Dashboard'); 
+        showToast(response.message || 'EMR Saved successfully.', 'success');
+
+        navigation.navigate(RouterConstants.MainTabs); 
       } else {
-        Alert.alert('Error', response?.message || 'Failed to save EMR data.');
+
+        showToast(response?.message || 'Failed to save EMR data.', 'error');
+
       }
     } catch (error) {
       console.error("EMR Save Error:", error);
-      Alert.alert('Error', error.message || 'An error occurred while saving EMR.');
+      showToast(error.message || 'An error occurred while saving EMR.', 'error');
+
     }
   };
 
@@ -562,7 +574,8 @@ const EMRGenerationScreen = () => {
       const isValid = fields.filter(f => f.required).every(f => tempItem[f.key] && tempItem[f.key].toString().trim() !== '');
       
       if (!isValid) {
-        Alert.alert("Missing Field", `Please enter all required fields for ${getTabLabel(category)}.`);
+        showToast(`Please enter all required fields for ${getTabLabel(category)}.`, "warning");
+
         return;
       }
 

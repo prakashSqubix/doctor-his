@@ -23,7 +23,8 @@ function RouteStack() {
       <Stack.Screen name={RouterConstants.LoginScreen} component={LoginScreen} />
       <Stack.Screen name={RouterConstants.TenantSelectionScreen} component={TenantSelectionScreen} />
       <Stack.Screen name={RouterConstants.FacilitySelectionScreen} component={FacilitySelectionScreen} />
-      <Stack.Screen name={RouterConstants.DashboardScreen} component={BottomTabBar} />
+      <Stack.Screen name={RouterConstants.MainTabs} component={BottomTabBar} />
+
       <Stack.Screen name={RouterConstants.EmrGenerationScreen} component={EMRGenerationScreen} />
       <Stack.Screen name={RouterConstants.PatientDetailsScreen} component={PatientDetailsScreen} />
       <Stack.Screen name={RouterConstants.PatientHistory} component={PatientHistory} />

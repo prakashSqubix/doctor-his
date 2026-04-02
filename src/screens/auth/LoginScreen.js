@@ -12,7 +12,10 @@ import {
   Animated
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import { loginStart, clearError } from '../../store/slices/authSlice';
+
+
 import { TextInput, Button } from '../../components';
 import { colors, spacing, typography, radius } from '../../Constants/theme';
 import { useLoginMutation } from '../../hooks/useAuth';
@@ -53,11 +56,16 @@ const CarouselItem = ({ item }) => {
   );
 };
 
+import { useToast } from '../../providers/ToastContext';
+
 export default function LoginScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  // const [email, setEmail] = useState('milan.mohapatra@squbix.com');
-  // const [password, setPassword] = useState('Milan@123');
+  const { showToast } = useToast();
+  const dispatch = useDispatch();
+
+  // const [email, setEmail] = useState('frontdesk@healthvillage.com');
+  // const [password, setPassword] = useState('12345678');
   const [email, setEmail] = useState('deepak.senapati@squbix.com');
   const [password, setPassword] = useState('99999999');
   const [errors, setErrors] = useState({});
@@ -91,7 +99,21 @@ export default function LoginScreen() {
     return () => clearInterval(timer);
   }, [activeIndex]);
 
+  useEffect(() => {
+    dispatch(loginStart()); // Clear error and loading state on mount
+  }, []);
+
+  useEffect(() => {
+    if (authError) {
+      showToast(authError, "error");
+      dispatch(clearError());
+    }
+  }, [authError]);
+
+
+
   const validateForm = () => {
+
     const newErrors = {};
 
     if (!email) {
@@ -112,6 +134,8 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!validateForm()) return;
+    
+    dispatch(loginStart());
   
     try {
       const result = await loginMutation.mutateAsync({
@@ -123,9 +147,10 @@ export default function LoginScreen() {
         case "NAVIGATE_TO_DASHBOARD":
           navigation.reset({
             index: 0,
-            routes: [{ name: "DashboardScreen" }],
+            routes: [{ name: RouterConstants.MainTabs }],
           });
           break;
+
   
         case "NAVIGATE_TO_TENANT_SELECTION":
           navigation.navigate("TenantSelectionScreen");
@@ -136,19 +161,15 @@ export default function LoginScreen() {
           break;
   
         default:
-          Alert.alert("Error", "Unexpected response from server");
+          showToast("Unexpected response from server", "error");
       }
     } catch (error) {
-      Alert.alert(
-        "Login Failed",
-        "Invalid email or password."
-      );
-    //   Alert.alert(
-    //     "Login Failed",
-    //     error.message || "Invalid email or password."
-    //   );
+      // Error is already handled by useLoginMutation's onError and the useEffect toast
+      console.log('Login error caught in component:', error.message);
     }
   };
+
+
   
   return (
     <KeyboardAvoidingView
@@ -228,9 +249,9 @@ export default function LoginScreen() {
             style={styles.button}
           />
 
-          {authError && (
-            <Text style={styles.errorText}>{authError}</Text>
-          )}
+
+          {/* Error text removed - now shown via Toast */}
+
         </View>
 
         {/* Demo Credentials */}

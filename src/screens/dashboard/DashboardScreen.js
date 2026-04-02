@@ -65,6 +65,7 @@ const DashboardScreen = () => {
                 index: 0,
                 routes: [{ name: RouterConstants.LoginScreen }],
               });
+
             } catch (error) {
               // Even if API fails, we still logout locally
               navigation.reset({

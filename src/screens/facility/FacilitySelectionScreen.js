@@ -16,9 +16,12 @@ import { BuildingIcon } from '../../../assets/svg';
 import { useSelectFacilityMutation } from '../../hooks/useAuth';
 import RouterConstants from '../../Constants/RouterConstants';
 
+import { useToast } from '../../providers/ToastContext';
+
 export default function FacilitySelectionScreen() {
   const navigation = useNavigation();
   const [selectedFacilityId, setSelectedFacilityId] = useState(null);
+  const { showToast } = useToast();
   
   const { 
     availableFacilities, 
@@ -43,13 +46,15 @@ export default function FacilitySelectionScreen() {
       if (result.type === 'NAVIGATE_TO_DASHBOARD') {
         navigation.reset({
           index: 0,
-          routes: [{ name: RouterConstants.DashboardScreen }],
+          routes: [{ name: RouterConstants.MainTabs }],
         });
+
       }
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to select facility');
+      showToast(error.message || 'Failed to select facility', 'error');
     }
   };
+
 
   return (
     <SafeAreaView style={styles.container}>

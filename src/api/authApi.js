@@ -12,8 +12,6 @@ export const authAPI = {
   // Select facility (for Case B)
   selectFacility: async (facilityData) => {
     const { facilitySelectionToken, ...bodyData } = facilityData;
-    console.log('payload',bodyData);
-    
     const response = await axiosInstance.post(
       API_CONFIG.ENDPOINTS.SELECT_FACILITY, 
       bodyData,
@@ -40,8 +38,24 @@ export const authAPI = {
     );
     return response.data;
   },
+  
+  // Select role (Automatic after facility selection if multiple roles)
+  selectRole: async (roleData) => {
+    const { roleSelectionToken, ...bodyData } = roleData;
+    const response = await axiosInstance.post(
+      API_CONFIG.ENDPOINTS.SELECT_ROLE,
+      bodyData,
+      {
+        headers: {
+          Authorization: `Bearer ${roleSelectionToken}`,
+        },
+      }
+    );
+    return response.data;
+  },
 
   // Refresh token
+
   refreshToken: async (refreshToken) => {
     const response = await axiosInstance.post(API_CONFIG.ENDPOINTS.REFRESH_TOKEN, { refreshToken });
     return response.data;

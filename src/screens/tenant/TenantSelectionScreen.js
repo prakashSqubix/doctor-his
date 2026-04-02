@@ -17,9 +17,13 @@ import { useSelectTenantMutation } from '../../hooks/useAuth';
 import RouterConstants from '../../Constants/RouterConstants';
 import { Calendar, Hospital } from 'lucide-react-native';
 
+import { useToast } from '../../providers/ToastContext';
+
 export default function TenantSelectionScreen() {
   const navigation = useNavigation();
   const [selectedTenantId, setSelectedTenantId] = useState(null);
+  const { showToast } = useToast();
+
   
   const { 
     availableTenants, 
@@ -47,8 +51,9 @@ const handleContinue = async () => {
     if (responseData?.accessToken && responseData?.facility) {
       navigation.reset({
         index: 0,
-        routes: [{ name: RouterConstants.DashboardScreen }],
+        routes: [{ name: RouterConstants.MainTabs }],
       });
+
       return;
     }
 
@@ -58,10 +63,10 @@ const handleContinue = async () => {
       return;
     }
 
-    Alert.alert("Error", "Unexpected response from server");
+    showToast("Unexpected response from server", "error");
 
   } catch (error) {
-    Alert.alert("Error", error.message || "Failed to select tenant");
+    showToast(error.message || "Failed to select tenant", "error");
   }
 };
 const tenantList = availableTenants?.filter(item =>
