@@ -1,12 +1,6 @@
 import React, { useState } from 'react';
-import {
-  TextInput as RNTextInput,
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-} from 'react-native';
-// import { MaterialIcons } from '@expo/vector-icons'; // ❌ ICONS COMMENTED
+import { Platform, View, Text, StyleSheet, TouchableOpacity, TextInput as RNTextInput } from 'react-native';
+import { Eye, EyeOff } from 'lucide-react-native';
 import { colors, spacing, typography, radius } from '../Constants/theme';
 
 export default function TextInput({
@@ -55,17 +49,18 @@ export default function TextInput({
           autoCapitalize="none"
         />
 
-        {/* Password Toggle Icon Removed */}
-        {/* <TouchableOpacity
-          onPress={() => setShowPassword(!showPassword)}
-          style={styles.iconButton}
-        >
-          <MaterialIcons
-            name={showPassword ? 'visibility' : 'visibility-off'}
-            size={20}
-            color={colors.textSecondary}
-          />
-        </TouchableOpacity> */}
+        {secureTextEntry && (
+          <TouchableOpacity
+            onPress={() => setShowPassword(!showPassword)}
+            style={styles.iconButton}
+          >
+            {showPassword ? (
+              <EyeOff size={20} color={colors.textSecondary} />
+            ) : (
+              <Eye size={20} color={colors.textSecondary} />
+            )}
+          </TouchableOpacity>
+        )}
       </View>
 
       {error && (

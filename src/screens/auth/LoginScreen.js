@@ -64,10 +64,10 @@ export default function LoginScreen() {
   const { showToast } = useToast();
   const dispatch = useDispatch();
 
-  // const [email, setEmail] = useState('frontdesk@healthvillage.com');
-  // const [password, setPassword] = useState('12345678');
-  const [email, setEmail] = useState('deepak.senapati@squbix.com');
-  const [password, setPassword] = useState('99999999');
+  const [email, setEmail] = useState('rajesh.khuntia@squbix.com');
+  const [password, setPassword] = useState('12345678');
+  // const [email, setEmail] = useState('deepak.senapati@squbix.com');
+  // const [password, setPassword] = useState('99999999');
   const [errors, setErrors] = useState({});
   
   const { error: authError } = useSelector((state) => state.auth);

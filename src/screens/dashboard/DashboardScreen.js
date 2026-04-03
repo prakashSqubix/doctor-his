@@ -148,6 +148,11 @@ const DashboardScreen = () => {
                   : 'Good Evening,'}
             <Text style={styles.headerName}>{user?.fullName ? user.fullName.split(' ')[0] : 'Doctor'}</Text>
             </Text>
+            {(user?.tenant?.name || user?.facility?.name) && (
+              <Text style={styles.headerSubtitle}>
+                {user?.tenant?.name}{user?.tenant?.name && user?.facility?.name ? ' • ' : ''}{user?.facility?.name}
+              </Text>
+            )}
           </View>
 
           <TouchableOpacity style={styles.avatarContainer} onPress={handleLogout}>
@@ -382,6 +387,11 @@ const styles = StyleSheet.create({
     color: colors.white,
     ...typography.h4, 
     fontWeight: '400',
+  },
+  headerSubtitle: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    ...typography.bodySm,
+    marginTop: 4,
   },
   avatarContainer: {
     position: 'relative',

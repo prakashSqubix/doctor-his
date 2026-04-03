@@ -1,6 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Platform, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import colorStrings from '../../Constants/AppColors';
 import RouterConstants from '../../Constants/RouterConstants';
@@ -25,6 +26,8 @@ import {
 
 const Tab = createBottomTabNavigator();
 const BottomTabBar = () => {
+  const insets = useSafeAreaInsets();
+  
   return (
     <>
       {Platform.OS === 'android' && (
@@ -51,13 +54,8 @@ const BottomTabBar = () => {
           tabBarStyle: {
             backgroundColor: 'white', // Make sure background is set
             paddingTop: 5,
-            height: Platform.OS === 'android' ? 60 : 60,
-            // elevation: -10, // Android shadow
-            // shadowColor: '#000', // iOS shadow color
-            // shadowOffset: { width: 0, height: -5 }, // Shadow positioned above
-            // shadowOpacity: 0.1, // iOS shadow opacity
-            // shadowRadius: 4, // iOS shadow blur
-            // zIndex: 10, // Ensure it's above other components
+            height: 60 + insets.bottom,
+            paddingBottom: insets.bottom,
           },
         }}
       >

@@ -55,6 +55,45 @@ export const useAiTranscriptionMutation = () => {
   });
 };
 
+// Fetch EMR Data query
+export const useEmrDataQuery = (params) => {
+  return useQuery({
+    queryKey: ['emrData', params],
+    queryFn: async () => {
+      const { data } = await axiosInstance.get(API_CONFIG.ENDPOINTS.GET_EMR_DATA, {
+        params: params
+      });
+      console.log('Get EMR Data:', data);
+      return data;
+    },
+    enabled: !!(params?.registrationId && params?.visitId && params?.facilityId),
+  });
+};
+
+// Unsign EMR mutation
+export const useUnsignEmrMutation = () => {
+  return useMutation({
+    mutationFn: async (payload) => {
+      const response = await axiosInstance.post(
+        API_CONFIG.ENDPOINTS.UNSIGN_EMR,
+        payload
+      );
+      return response.data;
+    },
+  });
+};
+
+// Update Visit Status mutation
+export const useUpdateVisitStatusMutation = () => {
+  return useMutation({
+    mutationFn: async ({ visitId, visitStatus }) => {
+      const url = `${API_CONFIG.ENDPOINTS.UPDATE_VISIT_STATUS}?visitId=${visitId}&visitStatus=${visitStatus}`;
+      const response = await axiosInstance.patch(url);
+      return response.data;
+    },
+  });
+};
+
 // Save EMR Data mutation
 export const useSaveEmrDataMutation = () => {
   return useMutation({

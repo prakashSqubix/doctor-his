@@ -12,9 +12,10 @@ import {
   StatusBar,
   Animated, 
   Easing,
-  Modal, 
   Pressable,
-  useWindowDimensions 
+  useWindowDimensions,
+  ActivityIndicator,
+  Modal
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -27,13 +28,17 @@ import {
 } from 'react-native-permissions';
 import RNFS from 'react-native-fs';
 
-import { useAiTranscriptionMutation, useSaveEmrDataMutation } from '../../hooks/useEmr';
+import { useAiTranscriptionMutation, useSaveEmrDataMutation, useVisitCompleteMutation, useEmrDataQuery, useUnsignEmrMutation, useUpdateVisitStatusMutation } from '../../hooks/useEmr';
 import { AI_API_CONFIG } from '../../api/aiApi';
 import { 
-  Mic, MicOff, ChevronLeft, Trash2, Activity, Edit3, CheckCircle, Clock, FileText, 
+  Mic, MicOff, ChevronLeft, Trash2, Activity, Edit3, CheckCircle, Clock, FileText,
   Shield, Info, Loader, Hash, Calendar, Zap, List, Plus, X,
   ChevronDown,
-  History
+  History,
+  Save,
+  LockOpen,
+  RotateCcw,
+  Thermometer
 } from 'lucide-react-native';
 import { useSelector } from 'react-redux';
 import RouterConstants from '../../Constants/RouterConstants';
@@ -48,7 +53,16 @@ const SEVERITY_TYPES = ['Mild', 'Moderate', 'Severe'];
 
 
 // --- GLOBAL CONSTANTS ---
-const audioPath = `${RNFS.DocumentDirectoryPath}/consultation_audio.aac`;
+const VITALS_CONFIG = [
+  { name: 'BP Systolic', unit: 'mmHg', min: 90, max: 120 },
+  { name: 'BP Diastolic', unit: 'mmHg', min: 60, max: 80 },
+  { name: 'Heart Rate', unit: 'bpm', min: 60, max: 100 },
+  { name: 'Temperature', unit: '°F', allowedUnits: ['°F', '°C'], min: 97.0, max: 99.1 },
+  { name: 'Respiratory Rate', unit: 'bpm', min: 12, max: 20 },
+  { name: 'Height', unit: 'cm', allowedUnits: ['cm', 'ft'] },
+  { name: 'Weight', unit: 'kg', allowedUnits: ['kg', 'lbs'] },
+  { name: 'SpO2', unit: '%', min: 95, max: 100 },
+];
 
 const EMRGenerationScreen = () => {
   const route = useRoute();
@@ -56,6 +70,17 @@ const EMRGenerationScreen = () => {
   const { user } = useSelector((state) => state.auth);
 
   const {mutateAsync,isPending,data} = useSaveEmrDataMutation()
+  const visitCompleteMutation = useVisitCompleteMutation();
+  const unsignMutation = useUnsignEmrMutation();
+  const updateStatusMutation = useUpdateVisitStatusMutation();
+
+  const { data: fetchedEmrData, isLoading: isFetchingEmr, refetch: refetchEmr } = useEmrDataQuery({
+    registrationId: patientData?.registrationId,
+    visitId: patientData?.visitId || patientData?._id,
+    facilityId: user?.facility?.facilityId
+  });
+
+  const [isEditing, setIsEditing] = useState(false);
   
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
@@ -73,10 +98,12 @@ const EMRGenerationScreen = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false); 
   const [transcript, setTranscript] = useState('');
+  const [lastRecordingPath, setLastRecordingPath] = useState(null);
+  const [hasProcessingError, setHasProcessingError] = useState(false);
   const apiIsLoading =aiTranscriptionMutation.isPending
   const tabs = [
-    'diagnosis', 'chiefComplaint', 'service', 'pharmacy', 'patientHistory', 
-    'familyHistory', 'surgicalHistory', 'allergies', 'instructions', 'summary'
+    'diagnosis', 'chiefComplaint', 'vitals', 'service', 'pharmacy', 'history', 
+    'allergies', 'instructions', 'summary'
   ];
   
   const [activeTab, setActiveTab] = useState('diagnosis');
@@ -91,14 +118,90 @@ const EMRGenerationScreen = () => {
     summary:  '',
   });
 
-  // Structured fields - used for Diagnosis, Chief Complaint, etc.
   const [structuredData, setStructuredData] = useState({
     pharmacy: [],
     allergies:  [],
     chiefComplaint:  [],
     diagnosis:  [],
     service:  [],
+    vitals: VITALS_CONFIG.map(c => ({ name: c.name, value: '', unit: c.unit })),
   });
+
+  // Populate data when fetched
+  useEffect(() => {
+    if (fetchedEmrData?.data) {
+      const emr = fetchedEmrData.data;
+      const emrDetails = emr.emrData || {};
+      
+      // isFormLocked was removed in favor of derived isFormLocked
+      // setIsSigned(emr.visitStatus === 'SIGNED' || emr.visitStatus === 'DRAFT');
+      
+      // If the data changed, we might want to reset isEditing if the status is no longer DRAFT/SIGNED
+      if (emr.visitStatus !== 'DRAFT' && emr.visitStatus !== 'SIGNED') {
+        setIsEditing(true); 
+      }
+
+      setFormText({
+        patientHistory: emrDetails.patientHistory || '',
+        familyHistory: emrDetails.familyHistory || '',
+        surgicalHistory: emrDetails.surgicalHistory || '',
+        instructions: emrDetails.instructions?.map(i => i.generalInstructions).join('\n') || '',
+        summary: emrDetails.summary || '',
+      });
+
+      // Map API names to component names
+      const mappedAllergies = emrDetails.allergies?.map(a => ({
+        ...a,
+        allergiesName: a.allergenName || a.allergiesName // Support both for safety
+      })) || [];
+
+      // Map API vitals or fill defaults
+      const apiVitals = emrDetails.vitals || [];
+      const updatedVitals = VITALS_CONFIG.map(config => {
+        const found = apiVitals.find(v => v.name === config.name);
+        return found ? found : { name: config.name, value: '', unit: config.unit };
+      });
+
+      setStructuredData({
+        pharmacy: emrDetails.pharmacy || [],
+        allergies: mappedAllergies,
+        chiefComplaint: emrDetails.chiefComplaint || [],
+        diagnosis: emrDetails.diagnosis || [],
+        service: emrDetails.service || [],
+        vitals: updatedVitals,
+      });
+      
+      if (emrDetails.transcription) {
+        setTranscript(emrDetails.transcription);
+      }
+    }
+  }, [fetchedEmrData]);
+
+  const handleUnsign = async () => {
+    try {
+      const response = await updateStatusMutation.mutateAsync({
+        visitId: patientData?.visitId || patientData?._id,
+        visitStatus: 'DRAFT'
+      });
+
+      if (response && response.statusCode === 200) {
+        showToast('EMR status updated to DRAFT. You can now click Edit Record.', 'success');
+        refetchEmr();
+      } else {
+        showToast(response?.message || 'Failed to update visit status.', 'error');
+      }
+    } catch (error) {
+      console.error("Update Status Error:", error);
+      showToast(error.message || 'An error occurred while updating status.', 'error');
+    }
+  };
+
+  const handleEditRecord = () => {
+    setIsEditing(true);
+    showToast('Editing enabled.', 'info');
+  };
+
+  const isFormLocked = (fetchedEmrData?.data?.visitStatus === 'SIGNED' || fetchedEmrData?.data?.visitStatus === 'DRAFT') && !isEditing;
 
   // --- Animation Setup (unchanged) ---
   useEffect(() => {
@@ -122,6 +225,54 @@ const EMRGenerationScreen = () => {
   // --- End Animation Setup ---
 
 
+  const getVitalStatus = (name, value, unit) => {
+    if (!value || isNaN(value)) return null;
+    const config = VITALS_CONFIG.find(c => c.name === name);
+    if (!config || config.min === undefined) return null;
+    
+    let val = parseFloat(value);
+    
+    // Normalize Temperature to F for range checking
+    if (name === 'Temperature' && unit === '°C') {
+      val = (val * 9/5) + 32;
+    }
+    
+    if (val < config.min) return { label: 'Low', color: '#EF4444' };
+    if (val > config.max) return { label: 'Abnormal', color: '#EF4444' };
+    return { label: 'Normal', color: '#10B981' };
+  };
+
+  const calculateBMI = useCallback(() => {
+    const heightVital = structuredData.vitals.find(v => v.name === 'Height') || { value: '', unit: 'cm' };
+    const weightVital = structuredData.vitals.find(v => v.name === 'Weight') || { value: '', unit: 'kg' };
+    
+    let h = parseFloat(heightVital.value);
+    let w = parseFloat(weightVital.value);
+    
+    if (!h || !w || h === 0) return null;
+    
+    // Normalize Height to cm
+    if (heightVital.unit === 'ft') {
+      h = h * 30.48; // Simple ft to cm
+    }
+    const heightInMeters = h / 100;
+
+    // Normalize Weight to kg
+    if (weightVital.unit === 'lbs') {
+      w = w * 0.453592;
+    }
+    
+    const bmi = w / (heightInMeters * heightInMeters);
+    const roundedBmi = bmi.toFixed(1);
+    
+    let status = { label: 'Normal', color: '#10B981' };
+    if (bmi < 18.5) status = { label: 'Underweight', color: '#F59E0B' };
+    else if (bmi >= 18.5 && bmi < 25) status = { label: 'Normal', color: '#10B981' };
+    else if (bmi >= 25 && bmi < 30) status = { label: 'Overweight', color: '#F59E0B' };
+    else if (bmi >= 30) status = { label: 'Obese', color: '#EF4444' };
+    
+    return { value: roundedBmi, ...status };
+  }, [structuredData.vitals]);
   // --- VOICE/AUDIO LOGIC ---
   const checkPermissions = useCallback(async () => {
     if (Platform.OS === 'android') {
@@ -170,14 +321,15 @@ const EMRGenerationScreen = () => {
       const filePath = await Sound.stopRecorder();
       Sound.removeRecordBackListener();
       
+      setLastRecordingPath(filePath);
+      setHasProcessingError(false);
+      
       // START PROCESSING
       setIsProcessing(true); 
       setAudioData(prev => ({ ...prev, isRecording: false }));
-      setTranscript('Audio recorded. Analyzing consultation...'); // Give immediate feedback
+      setTranscript('Audio recorded. Analyzing consultation...'); 
       
       const base64Audio = await RNFS.readFile(filePath, 'base64');
-      const fileExists = await RNFS.exists(filePath);
-      if (fileExists) await RNFS.unlink(filePath);
   
       try {
         const aiResult = await aiTranscriptionMutation.mutateAsync({ 
@@ -193,12 +345,7 @@ const EMRGenerationScreen = () => {
             chiefComplaint: aiResult.chiefComplaint || [],
             diagnosis: aiResult.diagnosis || [],
             service: aiResult.service || [],
-        });
-          // setStructuredData({
-          //   pharmacy: aiResult.pharmacy || [], allergies: aiResult.allergies || [], 
-          //   chiefComplaint: aiResult.chiefComplaint || [], diagnosis: aiResult.diagnosis || [], 
-          //   service: aiResult.service || [], instructions: aiResult.instructions || []
-          // });
+          });
 
           setFormText({
             patientHistory: aiResult?.patientHistory ,
@@ -206,30 +353,76 @@ const EMRGenerationScreen = () => {
             surgicalHistory: aiResult?.surgicalHistory,
             instructions: aiResult?.instructions?.map(i => i.generalInstructions).join('\n') || '',
             summary: aiResult?.summary,
-        });
-
-          // setFormText({
-          //   diagnosis: aiResult.diagnosis?.map(d => `${d.diagnosisName} (${d.icdCode || ''})`).join(', ') || '',
-          //   chiefComplaint: aiResult.chiefComplaint?.map(c => c.complaintName).join(', ') || '',
-          //   service: aiResult.service?.map(s => s.testOrServiceName).join(', ') || '',
-          //   pharmacy: aiResult.pharmacy?.map(p => p.medicineName).join(', ') || '',
-          //   patientHistory: aiResult.patientHistory || '',
-          //   familyHistory: aiResult.familyHistory || '',
-          //   surgicalHistory: aiResult.surgicalHistory || '',
-          //   allergies: aiResult.allergies?.map(a => a.allergiesName).join(', ') || '',
-          //   instructions: aiResult.instructions?.map(i => i.generalInstructions).join('\n') || '',
-          //   summary: aiResult.summary || '',
-          // });
+          });
+          
+          showToast("EMR fields populated.", "success");
+          // On success, we can safely delete the file
+          const fileExists = await RNFS.exists(filePath);
+          if (fileExists) await RNFS.unlink(filePath);
+          setLastRecordingPath(null);
         }
       } catch (aiError) {
         console.error(aiError);
-        setTranscript('AI processing failed. Please check the recording.');
+        setTranscript('AI processing failed. You can retry using the button below.');
+        setHasProcessingError(true);
       } finally {
-        // END PROCESSING
         setIsProcessing(false);
       }
     } catch (error) {
       console.error('Recording error:', error);
+      setIsProcessing(false);
+      setHasProcessingError(true);
+    }
+  };
+
+  const handleRetryTranscription = async () => {
+    if (!lastRecordingPath) {
+      showToast("No recording found to retry.", "warning");
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      setHasProcessingError(false);
+      setTranscript('Retrying analysis...');
+
+      const base64Audio = await RNFS.readFile(lastRecordingPath, 'base64');
+      
+      const aiResult = await aiTranscriptionMutation.mutateAsync({ 
+        base64AudioString: base64Audio, 
+        endpoint: selectedEndpoint 
+      });
+
+      if (aiResult) {
+        setTranscript(aiResult.transcription || '');
+        setStructuredData({
+          pharmacy: aiResult?.pharmacy || [],
+          allergies: aiResult.allergies || [],
+          chiefComplaint: aiResult.chiefComplaint || [],
+          diagnosis: aiResult.diagnosis || [],
+          service: aiResult.service || [],
+        });
+
+        setFormText({
+          patientHistory: aiResult?.patientHistory,
+          familyHistory: aiResult?.familyHistory,
+          surgicalHistory: aiResult?.surgicalHistory,
+          instructions: aiResult?.instructions?.map(i => i.generalInstructions).join('\n') || '',
+          summary: aiResult?.summary,
+        });
+
+        showToast("EMR fields populated successfully.", "success");
+        
+        // Clean up
+        const fileExists = await RNFS.exists(lastRecordingPath);
+        if (fileExists) await RNFS.unlink(lastRecordingPath);
+        setLastRecordingPath(null);
+      }
+    } catch (error) {
+      console.error('Retry error:', error);
+      setTranscript('Retry failed. Please try again or record a new consultation.');
+      setHasProcessingError(true);
+    } finally {
       setIsProcessing(false);
     }
   };
@@ -325,11 +518,10 @@ const EMRGenerationScreen = () => {
 
   const getTabLabel = (key) => {
     switch(key) {
-      case 'patientHistory': return 'Patient Hx';
-      case 'familyHistory': return 'Family Hx';
-      case 'surgicalHistory': return 'Surgical Hx';
+      case 'history': return 'History';
       case 'chiefComplaint': return 'Symptoms';
       case 'pharmacy': return 'Medications';
+      case 'vitals': return 'Vitals';
       default: return key.charAt(0).toUpperCase() + key.slice(1);
     }
   };
@@ -353,7 +545,7 @@ const EMRGenerationScreen = () => {
     setModalState(null);
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (type = 'DRAFT') => {
     // Helper to parser integer or float
     const parseNumber = (val) => {
         if (!val) return 0;
@@ -366,74 +558,76 @@ const EMRGenerationScreen = () => {
         ...p,
         dosageAmount: parseNumber(p.dosageAmount),
         duration: parseNumber(p.duration),
-        // Ensure unit/type is one of the allowed values or defaults if empty
-        // In a real app, you might want to validate this before submission or enforce via UI
-        dosageUnit: p.dosageUnit || 'tablet', // Default fallback if empty
+        dosageUnit: p.dosageUnit || 'tablet', 
         durationType: p.durationType || 'days',
     }));
 
     const processedChiefComplaint = structuredData.chiefComplaint.map(c => ({
         ...c,
         duration: parseNumber(c.duration),
-        // user might leave severity empty, ensure it's a string if needed
         severity: c.severity || 'Mild',
         durationType: c.durationType || 'days', 
     }));
 
     const finalJSON = {
         ...structuredData,
-        // Replace with processed arrays
         pharmacy: processedPharmacy,
         chiefComplaint: processedChiefComplaint,
-        
-        // Ensure other fields are strings
         patientHistory: formText.patientHistory || "",
         familyHistory: formText.familyHistory || "",
         surgicalHistory: formText.surgicalHistory || "",
         summary: formText.summary || "",
-        
-        // Instructions are simplified back into an array for the JSON output
-        instructions: [{ generalInstructions: formText.instructions || "" }] 
+        instructions: [{ generalInstructions: formText.instructions || "" }],
+        patientCondition: [{ condition: "Stable" }],
+        transcription: transcript || "" 
     };
 
     try {
+      // Step 1: Save EMR Data
       const response = await mutateAsync({
-        'registrationId': patientData?.registrationId,
-        visitId: patientData?.visitId,
+        registrationId: patientData?.registrationId,
+        visitId: patientData?.visitId || patientData?._id,
         facilityId: user?.facility?.facilityId,
         emrData : {...finalJSON}
       });
 
-      console.log("FINAL JSON SUBMISSION:", JSON.stringify(finalJSON, null, 2));
-
       if (response && response.statusCode === 200) {
-        showToast(response.message || 'EMR Saved successfully.', 'success');
+        // Step 2: Update Visit Status
+        const statusRes = await updateStatusMutation.mutateAsync({
+          visitId: patientData?.visitId || patientData?._id,
+          visitStatus: type === 'CHECKIN' ? 'SIGNED' : 'DRAFT'
+        });
 
-        navigation.navigate(RouterConstants.MainTabs); 
+        if (statusRes && statusRes.statusCode === 200) {
+          showToast(`EMR ${type === 'CHECKIN' ? 'Signed' : 'Draft saved'} successfully.`, 'success');
+          setIsEditing(false);
+          refetchEmr();
+        } else {
+          showToast(statusRes?.message || 'EMR saved but status update failed.', 'warning');
+        }
       } else {
-
         showToast(response?.message || 'Failed to save EMR data.', 'error');
-
       }
     } catch (error) {
-      console.error("EMR Save Error:", error);
-      showToast(error.message || 'An error occurred while saving EMR.', 'error');
-
+      console.error("Submit Error:", error);
+      showToast(error.message || 'An error occurred during submission.', 'error');
     }
   };
 
   // --- REUSABLE COMPONENTS ---
 
   const CardContainer = ({ children, headerIcon, headerText, onDelete, onEdit }) => (
-    <TouchableOpacity onPress={onEdit} disabled={!onEdit}>
+    <TouchableOpacity 
+        onPress={isFormLocked ? null : onEdit} 
+        disabled={!onEdit || isFormLocked}
+    >
         <View style={styles.listItemCard}>
             <View style={styles.cardHeader}>
                 <View style={styles.itemIconContainer}>
                     {headerIcon}
                 </View>
                 <Text style={styles.cardTitle}>{headerText}</Text>
-                {/* Delete button is always present, but requires an onDelete handler */}
-                {onDelete && (
+                {!isFormLocked && onDelete && (
                 <TouchableOpacity onPress={onDelete} style={{padding: 4}}>
                     <Trash2 size={16} color={colors.gray400} />
                 </TouchableOpacity>
@@ -499,7 +693,7 @@ const EMRGenerationScreen = () => {
             case 'service':
                 return { testOrServiceName: '', instructions: '', dateAndTime: '', ...base };
             case 'allergies':
-                return { allergiesName: '', icdCode: '', ...base };
+                return { allergenName: '', icdCode: '', ...base };
             case 'diagnosis':
                 return { diagnosisName: '', icdCode: '', ...base };
             default:
@@ -545,6 +739,7 @@ const EMRGenerationScreen = () => {
                 { key: 'instructions', label: 'Instructions/Purpose', placeholder: 'e.g., General health check', isMultiline: true, width: '100%' },
                 { key: 'dateAndTime', label: 'Date/Time (Optional)', placeholder: 'e.g., after one week', width: '100%' },
               ];
+              break;
               break;
             case 'allergies':
                 baseFields = [
@@ -712,13 +907,14 @@ const EMRGenerationScreen = () => {
   // --- RENDERERS ---
 
   const renderStructuredView = (category, listRenderer) => {
-    if (!['diagnosis', 'chiefComplaint', 'service', 'pharmacy', 'allergies'].includes(category)) return null;
+    if (!['diagnosis', 'chiefComplaint', 'service', 'pharmacy', 'allergies', 'vitals'].includes(category)) return null;
 
     return (
         <>
             <TouchableOpacity 
-                style={styles.addButton} 
-                onPress={() => setModalState({ category, mode: 'add', index: undefined, data: {} })}
+                style={[styles.addButton, isFormLocked && styles.disabledBtn]} 
+                onPress={() => !isFormLocked && setModalState({ category, mode: 'add', index: undefined, data: {} })}
+                disabled={isFormLocked}
             >
                 <Plus size={16} color={colors.primary} style={{marginRight: 6}}/>
                 <Text style={styles.addButtonText}>
@@ -730,6 +926,132 @@ const EMRGenerationScreen = () => {
     );
   };
   
+  const renderVitalsForm = () => {
+    const bmiRes = calculateBMI();
+    
+    // Separate BP and others
+    const bpSystolic = structuredData.vitals.find(v => v.name === 'BP Systolic') || { value: '' };
+    const bpDiastolic = structuredData.vitals.find(v => v.name === 'BP Diastolic') || { value: '' };
+    const otherVitals = VITALS_CONFIG.filter(c => !['BP Systolic', 'BP Diastolic'].includes(c.name));
+
+    const sbpStatus = getVitalStatus('BP Systolic', bpSystolic.value);
+    const dbpStatus = getVitalStatus('BP Diastolic', bpDiastolic.value);
+
+    return (
+      <View style={styles.listContainer}>
+        <Text style={styles.listTitle}>Patient Vitals Indicators</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between' }}>
+          
+          {/* Combined BP Card */}
+          <View style={styles.vitalCard}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.vitalName}>BP (Sys/Dia)</Text>
+              <View style={styles.vitalInputRow}>
+                <TextInput
+                  style={[styles.vitalValueInput, { color: sbpStatus?.color || colors.gray900 }, { minWidth: 35, textAlign: 'right' }]}
+                  value={bpSystolic.value}
+                  onChangeText={(val) => {
+                    const updated = structuredData.vitals.map(v => v.name === 'BP Systolic' ? { ...v, value: val } : v);
+                    setStructuredData(prev => ({ ...prev, vitals: updated }));
+                  }}
+                  placeholder="--"
+                  keyboardType="numeric"
+                  editable={!isFormLocked}
+                />
+                <Text style={[styles.vitalValue, { fontSize: 18, marginHorizontal: 2, color: colors.gray400 }]}>/</Text>
+                <TextInput
+                  style={[styles.vitalValueInput, { color: dbpStatus?.color || colors.gray900 }, { minWidth: 35, textAlign: 'left' }]}
+                  value={bpDiastolic.value}
+                  onChangeText={(val) => {
+                    const updated = structuredData.vitals.map(v => v.name === 'BP Diastolic' ? { ...v, value: val } : v);
+                    setStructuredData(prev => ({ ...prev, vitals: updated }));
+                  }}
+                  placeholder="--"
+                  keyboardType="numeric"
+                  editable={!isFormLocked}
+                />
+                <Text style={[styles.vitalUnitLabel, { marginLeft: 4 }]}>mmHg</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Other Vitals */}
+          {otherVitals.map((config) => {
+            const vital = structuredData.vitals.find(v => v.name === config.name) || { name: config.name, value: '', unit: config.unit };
+            const status = getVitalStatus(config.name, vital.value, vital.unit);
+            
+            return (
+              <View key={config.name} style={[styles.vitalCard, isFormLocked && { opacity: 0.8 }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.vitalName}>{config.name}</Text>
+                  <View style={styles.vitalInputRow}>
+                    <TextInput
+                      style={[styles.vitalValueInput, { color: status?.color || colors.gray900 }]}
+                      value={vital.value}
+                      onChangeText={(val) => {
+                        const updated = structuredData.vitals.map(v => 
+                          v.name === config.name ? { ...v, value: val } : v
+                        );
+                        setStructuredData(prev => ({ ...prev, vitals: updated }));
+                      }}
+                      placeholder="--"
+                      keyboardType="numeric"
+                      maxLength={5}
+                      editable={!isFormLocked}
+                    />
+                    {config.allowedUnits ? (
+                      <TouchableOpacity 
+                        onPress={() => {
+                          if (isFormLocked) return;
+                          const nextUnit = config.allowedUnits.find(u => u !== vital.unit);
+                          let nextValue = vital.value;
+                          
+                          if (vital.value && !isNaN(vital.value)) {
+                            const val = parseFloat(vital.value);
+                            if (config.name === 'Height') {
+                              nextValue = nextUnit === 'ft' ? (val * 0.0328084).toFixed(2) : (val / 0.0328084).toFixed(1);
+                            } else if (config.name === 'Weight') {
+                              nextValue = nextUnit === 'lbs' ? (val * 2.20462).toFixed(1) : (val / 2.20462).toFixed(1);
+                            } else if (config.name === 'Temperature') {
+                              nextValue = nextUnit === '°C' ? ((val - 32) * 5/9).toFixed(1) : ((val * 9/5) + 32).toFixed(1);
+                            }
+                          }
+
+                          const updated = structuredData.vitals.map(v => 
+                            v.name === config.name ? { ...v, unit: nextUnit, value: nextValue.toString() } : v
+                          );
+                          setStructuredData(prev => ({ ...prev, vitals: updated }));
+                        }}
+                        style={styles.unitToggle}
+                      >
+                         <Text style={styles.vitalUnitLabel}>{vital.unit}</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <Text style={styles.vitalUnitLabel}>{config.unit}</Text>
+                    )}
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+          
+          {/* BMI Card */}
+          {bmiRes && (
+            <View style={[styles.vitalCard, { backgroundColor: '#F0F9FF', borderColor: '#BAE6FD' }]}>
+               <View style={{ flex: 1 }}>
+                  <Text style={[styles.vitalName, { color: '#0369A1' }]}>Body Mass Index (BMI)</Text>
+                  <View style={styles.vitalInputRow}>
+                    <Text style={[styles.vitalValue, { fontSize: 22, color: bmiRes.color }]}>{bmiRes.value}</Text>
+                    <Text style={[styles.vitalUnitLabel, { marginLeft: 6 }]}>kg/m²</Text>
+                  </View>
+                </View>
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  };
+
   // 1. Symptoms/Chief Complaint List
   const renderSymptomsList = () => {
     if (!structuredData.chiefComplaint || structuredData.chiefComplaint.length === 0) return (
@@ -901,7 +1223,7 @@ const EMRGenerationScreen = () => {
             >
                <Shield size={14} color={colors.primary} style={{marginRight: 6}} />
                <View>
-                 <Text style={styles.blueChipText}>{item.allergiesName}</Text>
+                 <Text style={styles.blueChipText}>{item.allergenName || item.allergiesName}</Text>
                  {item.icdCode && (
                     <Text style={styles.chipSubText}>{item.icdCode}</Text>
                  )}
@@ -938,6 +1260,15 @@ const EMRGenerationScreen = () => {
   );
 
   // --- MAIN RENDER ---
+  if (isFetchingEmr) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ marginTop: 12, color: colors.gray600, fontWeight: '600' }}>Loading EMR Data...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
@@ -960,35 +1291,49 @@ const EMRGenerationScreen = () => {
       </View>
 
       <KeyboardAvoidingView 
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={{ flex: 1 }}
       >
         <ScrollView 
           style={styles.mainScroll} 
-          contentContainerStyle={{ paddingBottom: 100 }}
+          contentContainerStyle={{ paddingBottom: 150 }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
           
           {/* Voice Recorder Section */}
           <View style={styles.voiceSection}>
-            <View style={[styles.micRing, (audioData?.isRecording || isProcessing) && styles.micRingActive]}>
-              <TouchableOpacity 
-                style={[styles.micButton, (audioData?.isRecording || isProcessing) && styles.micButtonRecording]}
-                onPress={handleRecordAudio}
-                disabled={isProcessing || apiIsLoading} 
-              >
-                {(isProcessing || apiIsLoading) ? (
-                  <Animated.View style={animatedStyle}><Loader size={32} color="white" /></Animated.View>
-                ) : audioData?.isRecording ? (
-                  <MicOff size={32} color="white" />
-                ) : (
-                  <Mic size={32} color="white" />
-                )}
-              </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20 }}>
+              <View style={[styles.micRing, (audioData?.isRecording || isProcessing) && styles.micRingActive]}>
+                <TouchableOpacity 
+                  style={[styles.micButton, (audioData?.isRecording || isProcessing) && styles.micButtonRecording]}
+                  onPress={handleRecordAudio}
+                  disabled={isProcessing || apiIsLoading} 
+                >
+                  {isProcessing ? (
+                    <Loader size={28} color={colors.white} />
+                  ) : audioData?.isRecording ? (
+                    <MicOff size={28} color={colors.white} />
+                  ) : (
+                    <Mic size={28} color={colors.white} />
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              {hasProcessingError && !audioData?.isRecording && !isProcessing && (
+                <TouchableOpacity 
+                  style={styles.retryButton}
+                  onPress={handleRetryTranscription}
+                >
+                  <RotateCcw size={24} color={colors.white} />
+                </TouchableOpacity>
+              )}
             </View>
+            
             <Text style={styles.recordingStatusText}>
-              {(isProcessing || apiIsLoading) ? "Processing..." : audioData?.isRecording ? "Tap to Stop" : "Tap to Record"}
+              {isProcessing ? 'Processing consultation...' : 
+               audioData?.isRecording ? 'Listening... Tap to stop' : 
+               hasProcessingError ? 'Generation failed' : 'Consultation Voice Assistant'}
             </Text>
             {(isProcessing || apiIsLoading) ? renderProcessingView() : (transcript !== '' && (
               <View style={styles.transcriptBubble}>
@@ -1022,20 +1367,64 @@ const EMRGenerationScreen = () => {
                  <Edit3 size={16} color={colors.gray400} />
                </View>
 
-               {/* Main Text Input for History/Summary/Manual Edit */}
-               {(!['diagnosis', 'chiefComplaint', 'service', 'pharmacy', 'allergies'].includes(activeTab) || ['instructions', 'summary'].includes(activeTab)) && (
+               {/* History Section - Consolidated */}
+               {activeTab === 'history' && (
+                 <View style={{ gap: 16 }}>
+                   <View>
+                     <Text style={styles.formLabel}>Patient History</Text>
+                     <TextInput
+                       style={[styles.modernInput, isFormLocked && styles.readOnlyInput, { height: 80 }]}
+                       placeholder="Enter patient history..."
+                       placeholderTextColor={colors.gray400}
+                       multiline
+                       value={formText.patientHistory}
+                       onChangeText={(text) => setFormText(prev => ({...prev, patientHistory: text}))}
+                       editable={!isFormLocked}
+                     />
+                   </View>
+                   <View>
+                     <Text style={styles.formLabel}>Family History</Text>
+                     <TextInput
+                       style={[styles.modernInput, isFormLocked && styles.readOnlyInput, { height: 80 }]}
+                       placeholder="Enter family history..."
+                       placeholderTextColor={colors.gray400}
+                       multiline
+                       value={formText.familyHistory}
+                       onChangeText={(text) => setFormText(prev => ({...prev, familyHistory: text}))}
+                       editable={!isFormLocked}
+                     />
+                   </View>
+                   <View>
+                     <Text style={styles.formLabel}>Surgical History</Text>
+                     <TextInput
+                       style={[styles.modernInput, isFormLocked && styles.readOnlyInput, { height: 80 }]}
+                       placeholder="Enter surgical history..."
+                       placeholderTextColor={colors.gray400}
+                       multiline
+                       value={formText.surgicalHistory}
+                       onChangeText={(text) => setFormText(prev => ({...prev, surgicalHistory: text}))}
+                       editable={!isFormLocked}
+                     />
+                   </View>
+                 </View>
+               )}
+
+               {/* Main Text Input for Instructions/Summary */}
+               {['instructions', 'summary'].includes(activeTab) && (
                    <TextInput
-                      style={styles.modernInput}
+                      style={[styles.modernInput, isFormLocked && styles.readOnlyInput]}
                       placeholder={`Enter ${getTabLabel(activeTab)} details...`}
                       placeholderTextColor={colors.gray400}
                       multiline
                       value={formText[activeTab]}
                       onChangeText={(text) => setFormText(prev => ({...prev, [activeTab]: text}))}
+                      editable={!isFormLocked}
                     />
                )}
 
                 {/* Structured List Views */}
                 {activeTab === 'diagnosis' && renderStructuredView('diagnosis', renderDiagnosisList)}
+                {activeTab === 'vitals' && renderVitalsForm()}
                 {activeTab === 'chiefComplaint' && renderStructuredView('chiefComplaint', renderSymptomsList)}
                 {activeTab === 'service' && renderStructuredView('service', renderServiceList)}
                 {activeTab === 'pharmacy' && renderStructuredView('pharmacy', renderPharmacyList)}
@@ -1063,11 +1452,70 @@ const EMRGenerationScreen = () => {
       <ActionModalWrapper />
 
       {/* Footer */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 10 }]}>
-        <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
-          <CheckCircle size={20} color="white" style={{marginRight: 8}}/>
-          <Text style={styles.submitBtnText}>Generate Final EMR</Text>
-        </TouchableOpacity>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
+        {fetchedEmrData?.data?.visitStatus === 'SIGNED' && !isEditing ? (
+          <TouchableOpacity 
+            style={[styles.unsignBtn, updateStatusMutation.isPending && styles.disabledBtn]} 
+            onPress={handleUnsign}
+            disabled={updateStatusMutation.isPending}
+          >
+            {updateStatusMutation.isPending ? (
+              <ActivityIndicator color="#B45309" />
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center',justifyContent:'center' }}>
+                <LockOpen size={18} color="#B45309" style={{marginRight: 8}}/>
+                <Text style={styles.unsignBtnText}>Unsign Record</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        ) : fetchedEmrData?.data?.visitStatus === 'DRAFT' && !isEditing ? (
+          <TouchableOpacity 
+            style={[styles.editRecordBtn, updateStatusMutation.isPending && styles.disabledBtn]} 
+            onPress={handleEditRecord}
+            disabled={updateStatusMutation.isPending}
+          >
+            {updateStatusMutation.isPending ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center',justifyContent:'center' }}>
+                <Edit3 size={20} color="white" style={{marginRight: 8}}/>
+                <Text style={styles.editRecordBtnText}>Edit Record</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.footerButtons}>
+            <TouchableOpacity 
+              style={[styles.draftBtn, (isPending || updateStatusMutation.isPending) && styles.disabledBtn]} 
+              onPress={() => handleSubmit('DRAFT')}
+              disabled={isPending || updateStatusMutation.isPending}
+            >
+              {(isPending || updateStatusMutation.isPending) ? (
+                <ActivityIndicator color={colors.primary} />
+              ) : (
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Save size={20} color={colors.primary} style={{marginRight: 8}}/>
+                  <Text style={styles.draftBtnText}>Draft</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.submitBtn, (isPending || updateStatusMutation.isPending) && styles.disabledBtn]} 
+              onPress={() => handleSubmit('CHECKIN')}
+              disabled={isPending || updateStatusMutation.isPending}
+            >
+              {(isPending || updateStatusMutation.isPending) ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <CheckCircle size={20} color="white" style={{marginRight: 8}}/>
+                  <Text style={styles.submitBtnText}>Sign</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
     </View>
@@ -1089,6 +1537,7 @@ const styles = StyleSheet.create({
   micButton: { width: 60, height: 60, borderRadius: 30, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', ...shadows.md },
   micButtonRecording: { backgroundColor: colors.primaryDark },
   recordingStatusText: { fontSize: 13, color: colors.gray600, fontWeight: '600' },
+  retryButton: { width: 50, height: 50, borderRadius: 25, backgroundColor: colors.gray500, alignItems: 'center', justifyContent: 'center', ...shadows.md },
   
   transcriptBubble: { marginTop: 12, backgroundColor: colors.white, padding: 12, borderRadius: 12, width: '100%', ...shadows.sm },
   transcriptText: { color: colors.gray800, fontSize: 12, fontStyle: 'italic' },
@@ -1229,6 +1678,55 @@ const styles = StyleSheet.create({
   cardLabel: { fontSize: 14, color: colors.gray500, fontWeight: '500' },
   cardValue: { fontSize: 14, color: colors.gray800, fontWeight: '600', flex: 1 },
 
+  vitalInputRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  vitalValueInput: { fontSize: 20, fontWeight: '700', color: colors.gray900, padding: 0, minWidth: 40 },
+  vitalUnitLabel: { fontSize: 12, color: colors.gray500, marginLeft: 4, fontWeight: '600' },
+  unitToggle: { backgroundColor: colors.gray100, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 4 },
+  vitalStatusLabel: { fontSize: 10, fontWeight: '700', marginTop: 4, textTransform: 'uppercase' },
+
+  // VITALS STYLES
+  vitalCard: {
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    width: '48%', 
+    minHeight: 85,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    ...shadows.sm,
+    position: 'relative',
+  },
+  vitalIconContainer: {
+    backgroundColor: '#F8FAFC',
+    padding: 8,
+    borderRadius: 10,
+  },
+  vitalName: {
+    fontSize: 11,
+    color: colors.gray600,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  vitalValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.gray900,
+  },
+  vitalUnit: {
+    fontSize: 11,
+    color: colors.gray500,
+    fontWeight: '500',
+  },
+  vitalDeleteBtn: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    padding: 4,
+  },
+
   chipContainer: { flexDirection: 'row', flexWrap: 'wrap' },
   blueChip: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#EFF6FF', 
@@ -1242,8 +1740,56 @@ const styles = StyleSheet.create({
   infoBoxText: { color: colors.gray600, fontSize: 12 },
   
   footer: { backgroundColor: colors.white, paddingTop: 16, paddingHorizontal: 20, borderTopWidth: 1, borderTopColor: colors.gray100, ...shadows.lg },
-  submitBtn: { backgroundColor: colors.primary, borderRadius: 16, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  submitBtnText: { color: colors.white, fontSize: 16, fontWeight: '700' },
+  footerButtons: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+  submitBtn: { 
+    flex: 1.5, 
+    backgroundColor: colors.primary, 
+    borderRadius: 16, 
+    paddingVertical: 14, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    ...shadows.md
+  },
+  submitBtnText: { color: colors.white, fontSize: 16, fontWeight: '700', letterSpacing: 0.5 },
+  draftBtn: { 
+    flex: 1, 
+    backgroundColor: colors.white, 
+    borderRadius: 16, 
+    paddingVertical: 14, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    borderWidth: 1, 
+    borderColor: colors.primary,
+    ...shadows.sm
+  },
+  unsignBtn: { 
+    flex: 1, 
+    backgroundColor: '#FEF3C7', 
+    borderRadius: 12, 
+    paddingVertical: 12, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    ...shadows.sm
+  },
+  unsignBtnText: { color: '#B45309', fontSize: 15, fontWeight: '600' },
+  editRecordBtn: { 
+    flex: 1, 
+    backgroundColor: colors.primary, 
+    borderRadius: 16, 
+    paddingVertical: 14,
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    ...shadows.md
+  },
+  editRecordBtnText: { color: colors.white, fontSize: 16, fontWeight: '700', letterSpacing: 0.5 },
+  disabledBtn: { opacity: 0.6, backgroundColor: colors.gray400, borderColor: colors.gray400 },
+  readOnlyInput: { backgroundColor: colors.gray50, color: colors.gray600 },
 })
 
 export default EMRGenerationScreen;

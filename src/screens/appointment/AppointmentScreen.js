@@ -445,7 +445,7 @@ const AppointmentsScreen = () => {
           <View style={styles.iconCircle}>
              <MapPin color={colors.primary} size={12} />
           </View>
-          <Text style={styles.doctorNameText}>Dr. {appointment.doctorName}</Text>
+          <Text style={styles.doctorNameText}>{appointment.doctorName}</Text>
         </View>
       </View>
     </View>
@@ -463,7 +463,7 @@ const AppointmentsScreen = () => {
       <View style={styles.metaItem}>
         <Text style={styles.metaLabel}>APPOINTMENT TYPE</Text>
         <View style={styles.typeTag}>
-          <Text style={styles.typeTagText}>{appointment.appointmentType}</Text>
+          <Text style={styles.typeTagText}>{appointment.visitType}</Text>
         </View>
       </View>
     </View>
