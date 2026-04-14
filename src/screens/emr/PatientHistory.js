@@ -328,7 +328,7 @@ const colors = {
 const styles = StyleSheet.create({
   mainContainer: { flex: 1, backgroundColor: colors.primary },
   container: { flex: 1, backgroundColor: colors.gray50, borderTopLeftRadius: 30, borderTopRightRadius: 30, overflow: 'hidden' },
-  scrollContent: { padding: 16, paddingBottom: 40 },
+  scrollContent: { padding: 16, paddingBottom: 120 },
   
   // Date Tabs
   tabsContainer: { backgroundColor: colors.white, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.gray200 },

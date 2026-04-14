@@ -28,7 +28,7 @@ import {
 } from 'react-native-permissions';
 import RNFS from 'react-native-fs';
 
-import { useAiTranscriptionMutation, useAiChunkTranscriptionMutation, useSaveEmrDataMutation, useVisitCompleteMutation, useEmrDataQuery, useUnsignEmrMutation, useUpdateVisitStatusMutation } from '../../hooks/useEmr';
+import { useAiTranscriptionMutation, useAiChunkTranscriptionMutation, useSaveEmrDataMutation, useVisitCompleteMutation, useEmrDataQuery, useUnsignEmrMutation, useUpdateVisitStatusMutation, useDeleteAiSessionMutation } from '../../hooks/useEmr';
 import { AI_API_CONFIG } from '../../api/aiApi';
 import { 
   Mic, MicOff, ChevronLeft, Trash2, Activity, Edit3, CheckCircle, Clock, FileText,
@@ -91,6 +91,7 @@ const EMRGenerationScreen = () => {
   const [selectedEndpoint, setSelectedEndpoint] = useState(AI_API_CONFIG.ENDPOINTS.TRANSCRIPTION);
   const aiTranscriptionMutation = useAiTranscriptionMutation();
   const aiChunkTranscriptionMutation = useAiChunkTranscriptionMutation();
+  const deleteAiSessionMutation = useDeleteAiSessionMutation();
   const [sessionId, setSessionId] = useState(null);
   const chunkTimerRef = useRef(null);
   const uiTimerRef = useRef(null);
@@ -121,11 +122,11 @@ const EMRGenerationScreen = () => {
   const [hasProcessingError, setHasProcessingError] = useState(false);
   const apiIsLoading =aiTranscriptionMutation.isPending
   const tabs = [
-    'diagnosis', 'chiefComplaint', 'vitals', 'service', 'pharmacy', 'history', 
-    'allergies', 'instructions', 'summary'
+    'vitals', 'chiefComplaint', 'history', 'allergies', 'diagnosis', 'pharmacy', 
+    'service', 'instructions', 'summary'
   ];
   
-  const [activeTab, setActiveTab] = useState('diagnosis');
+  const [activeTab, setActiveTab] = useState('vitals');
   const [modalState, setModalState] = useState(null); 
 
   // Combined text fields - only used for history, summary, and instructions
@@ -442,6 +443,48 @@ const EMRGenerationScreen = () => {
       }
     }, 20000); // 20 seconds
   }, [aiChunkTranscriptionMutation]);
+
+  const handleCancelRecording = async () => {
+    try {
+      // 1. Clear all timers
+      if (chunkTimerRef.current) {
+        clearInterval(chunkTimerRef.current);
+        chunkTimerRef.current = null;
+      }
+      if (uiTimerRef.current) {
+        clearInterval(uiTimerRef.current);
+        uiTimerRef.current = null;
+      }
+
+      // 2. Stop recorder if active
+      if (isRecordingActive.current) {
+        await Sound.stopRecorder();
+        isRecordingActive.current = false;
+      }
+      
+      Sound.removeRecordBackListener();
+      
+      // 3. Reset states
+      setIsRecording(false);
+      setAudioData(prev => ({ ...prev, isRecording: false }));
+      setRecordingSeconds(0);
+      setShowRecordingSheet(false);
+      setIsProcessing(false);
+      
+      // 4. Call delete API if we have a session ID
+      /*
+      if (sessionId) {
+        deleteAiSessionMutation.mutate(sessionId);
+        setSessionId(null);
+      }
+      */
+      
+      showToast("Recording cancelled", "info");
+    } catch (error) {
+      console.error('Error cancelling recording:', error);
+      setShowRecordingSheet(false);
+    }
+  };
 
   const stopRecording = async () => {
     try {
@@ -1169,6 +1212,18 @@ const EMRGenerationScreen = () => {
              <Text style={styles.recordingTimerText}>
                 {Math.floor(recordingSeconds / 60).toString().padStart(2, '0')}:{(recordingSeconds % 60).toString().padStart(2, '0')}
              </Text>
+          )}
+
+          {/* Cancel Button */}
+          {isRecording && (
+            <TouchableOpacity 
+              style={styles.cancelRecordingBtn} 
+              onPress={handleCancelRecording}
+              activeOpacity={0.7}
+            >
+              <Trash2 size={20} color={colors.red500} />
+              <Text style={styles.cancelRecordingText}>Cancel</Text>
+            </TouchableOpacity>
           )}
       </View>
 
@@ -2164,6 +2219,24 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 13, fontWeight: '600', color: colors.gray500 },
   tabTextActive: { color: colors.white },
 
+  cancelRecordingBtn: {
+    marginTop: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: '#FEF2F2', // Light red
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+  },
+  cancelRecordingText: {
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.red600,
+  },
+
   formContainer: { paddingHorizontal: 20 },
   inputGroup: { marginBottom: 20 },
   sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
@@ -2376,7 +2449,7 @@ const styles = StyleSheet.create({
     ...shadows.sm
   },
   unsignBtn: { 
-    flex: 1, 
+    width: '100%', 
     backgroundColor: '#FEF3C7', 
     borderRadius: 12, 
     paddingVertical: 12, 
@@ -2389,7 +2462,7 @@ const styles = StyleSheet.create({
   },
   unsignBtnText: { color: '#B45309', fontSize: 15, fontWeight: '600' },
   editRecordBtn: { 
-    flex: 1, 
+    width: '100%', 
     backgroundColor: colors.primary, 
     borderRadius: 16, 
     paddingVertical: 14,

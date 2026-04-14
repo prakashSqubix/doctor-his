@@ -314,7 +314,7 @@ const AppointmentsScreen = () => {
         refreshControl={
           <RefreshControl refreshing={isRefetching} onRefresh={onRefresh} />
         }
-        contentContainerStyle={{flexGrow: 1}}
+        contentContainerStyle={{flexGrow: 1, paddingBottom: 120}}
       >
         {isLoading ? (
           <View style={styles.emptyState}>

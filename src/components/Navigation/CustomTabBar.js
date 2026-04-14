@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
     pointerEvents: 'box-none',
   },
   container: {
-    backgroundColor: 'rgba(255, 255, 255, 0.80)',
+    backgroundColor: 'rgba(255, 255, 255,.9)',
     // backgroundColor: '#FFFFFF33',
     borderRadius: 35,
     borderWidth: 1.5,

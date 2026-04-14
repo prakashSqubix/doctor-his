@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -8,7 +8,8 @@ import {
   Alert,
   StyleSheet,
   Dimensions,
-  StatusBar
+  StatusBar,
+  Platform
 } from "react-native";
 import { LogoutIcon } from '../../../assets/svg';
 // CHECK THIS PATH: Ensure this matches your project structure
@@ -131,8 +132,15 @@ const DashboardScreen = () => {
       { text: "Cancel", style: "cancel" },
     ]);
   };
-console.log('data?.data?.find(item => item.cardId === ',data?.data?.find(item => item?.cardId === '692ffd5e1f88a2e6cbf460c1'));
 
+
+  const getTypeColor = (type) => {
+    switch (type?.toUpperCase()) {
+      case 'OP': return colors.success;
+      case 'IP': return colors.info;
+      default: return colors.primary;
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -189,7 +197,7 @@ console.log('data?.data?.find(item => item.cardId === ',data?.data?.find(item =>
               </View>
               <View style={styles.statInfo}>
                 <Text style={styles.statLabel}>Today</Text>
-                <Text style={styles.statValue}>{data?.data?.find(item => item.cardId === '693006591f88a2e6cbf460c2')?.data?.[0]?.count}</Text>
+                <Text style={styles.statValue}>{data?.data?.find(item => item.cardId === '692d8aebf11c839e0fa0b45b')?.data?.[0]?.count}</Text>
               </View>
             </View>
           </TouchableOpacity>
@@ -202,7 +210,7 @@ console.log('data?.data?.find(item => item.cardId === ',data?.data?.find(item =>
               </View>
               <View style={styles.statInfo}>
                 <Text style={styles.statLabel}>Check-In</Text>
-                <Text style={styles.statValue}>{data?.data?.find(item => item.cardId === '692ffd5e1f88a2e6cbf460c1')?.data?.[0]?.count}</Text>
+                <Text style={styles.statValue}>{data?.data?.find(item => item.cardId === '693006591f88a2e6cbf460c2')?.data?.[0]?.count}</Text>
               </View>
             </View>
           </TouchableOpacity>
@@ -218,8 +226,8 @@ console.log('data?.data?.find(item => item.cardId === ',data?.data?.find(item =>
                 <Stethoscope color={colors.success} size={20} />
               </View>
               <View style={styles.statInfo}>
-                <Text style={styles.statLabel}>Completed</Text>
-                <Text style={[styles.statValue, { color: colors.success }]}>{stats.completed}</Text>
+                <Text style={styles.statLabel}>This Week</Text>
+                <Text style={styles.statValue}>{data?.data?.find(item => item?.cardId === '693006591f88a2e6cbf460c3')?.data?.[0]?.count}</Text>
               </View>
               
             </View>
@@ -230,12 +238,12 @@ console.log('data?.data?.find(item => item.cardId === ',data?.data?.find(item =>
           {/* Added shadows.sm here */}
           <TouchableOpacity disabled style={[styles.statCard, shadows.sm]}>
             <View style={styles.statContent}>
-            <View style={[styles.iconBox, styles.bgWarningLight]}>
-                <Clock color={colors.warning} size={20} />
+            <View style={[styles.iconBox, styles.bgInfoLight]}>
+                <Calendar color={colors.info} size={20} />
               </View>
               <View style={styles.statInfo}>
-                <Text style={styles.statLabel}>Pending</Text>
-                <Text style={[styles.statValue, { color: colors.warning }]}>{data?.data?.find(item => item?.cardId === '692ffd5e1f88a2e6cbf460c1')?.data?.[0]?.count}</Text>
+                <Text style={styles.statLabel}>This Month</Text>
+                <Text style={styles.statValue}>{data?.data?.find(item => item?.cardId === '693006591f88a2e6cbf460c4')?.data?.[0]?.count}</Text>
               </View>
             </View>
           </TouchableOpacity>
@@ -243,7 +251,10 @@ console.log('data?.data?.find(item => item.cardId === ',data?.data?.find(item =>
       </View>
 
       {/* Body Scroll */}
-      <ScrollView style={styles.bodyScroll}>
+      <ScrollView 
+        style={styles.bodyScroll}
+        contentContainerStyle={{ paddingBottom: 120 }}
+      >
         {/* Appointments */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -256,26 +267,45 @@ console.log('data?.data?.find(item => item.cardId === ',data?.data?.find(item =>
 
           {/* Added shadows.sm here */}
           <View style={[styles.cardList, shadows.sm]}>
-            {appointments?.map((appointment, index) => (
-              <TouchableOpacity 
-                key={appointment.id} 
-                style={[
-                  styles.appointmentRow, 
-                  index === appointments.length - 1 && styles.lastRow
-                ]}
-                onPress={()=>navigation.navigate(RouterConstants.EmrGenerationScreen,{patientData:appointment})}
-              >
-                <Image source={{ uri: appointment.avatar }} style={styles.listAvatar} />
-                <View style={styles.listContent}>
-                  <Text style={styles.listTitle}>{appointment.patientName}</Text>
-                  <Text style={styles.listSubtitle}>{appointment.appointmentType}</Text>
+            {appointments && appointments.length > 0 ? (
+              appointments?.map((appointment, index) => (
+                <TouchableOpacity 
+                  key={appointment.id} 
+                  style={[
+                    styles.appointmentRow, 
+                    index === appointments.length - 1 && styles.lastRow
+                  ]}
+                  onPress={()=>navigation.navigate(RouterConstants.EmrGenerationScreen,{patientData:appointment})}
+                >
+                  <View style={[styles.typeIndicator, { backgroundColor: getTypeColor(appointment.visitType) }]} />
+                  <View style={styles.listContent}>
+                    <Text style={styles.listTitle}>{appointment.patientName}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <View style={[styles.typeBadge, { backgroundColor: getTypeColor(appointment.visitType) + '15' }]}>
+                        <Text style={[styles.typeBadgeText, { color: getTypeColor(appointment.visitType) }]}>
+                          {appointment.visitType}
+                        </Text>
+                      </View>
+                      <Text style={styles.encounterIdText}>#{appointment.encounterId}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.listRight}>
+                    <View style={styles.timeContainer}>
+                      <Clock size={12} color={colors.gray400} style={{ marginRight: 4 }} />
+                      <Text style={styles.listTime}>{moment(appointment?.scheduledTime, "HH:mm").format("hh:mm A")}</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <View style={{ padding: 40, alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                  <Calendar color="#94A3B8" size={32} />
                 </View>
-                <View style={styles.listRight}>
-                  {/* <Text style={styles.listTitle}>{appointment.scheduledTime}</Text> */}
-                  <Text style={styles.listTitle}>{moment(appointment?.scheduledTime, "HH:mm").format("hh:mm A")}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+                <Text style={{ color: colors.gray800, fontSize: 16, fontWeight: '600', marginBottom: 6 }}>No Appointments</Text>
+                <Text style={{ color: colors.gray500, fontSize: 13, textAlign: 'center' }}>You don't have any appointments scheduled for today.</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -320,15 +350,6 @@ console.log('data?.data?.find(item => item.cardId === ',data?.data?.find(item =>
                   <FileText size={24} color={colors.primary} />
                 </View>
                 <Text style={styles.actionLabel}>Generate EMR</Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={[styles.statCard, shadows.sm]}>
-              <View style={styles.centerContent}>
-                <View style={[styles.largeIconCircle, styles.bgSuccessLight]}>
-                  <Stethoscope size={24} color={colors.success} />
-                </View>
-                <Text style={styles.actionLabel}>Prescription</Text>
               </View>
             </TouchableOpacity>
           </View>
@@ -469,6 +490,7 @@ const styles = StyleSheet.create({
   bgPrimaryLight: { backgroundColor: colors.primaryLight },
   bgSuccessLight: { backgroundColor: '#DCFCE7' }, 
   bgWarningLight: { backgroundColor: '#FEF3C7' }, 
+  bgInfoLight: { backgroundColor: '#E0F2FE' },
   
   statInfo: {
     marginLeft: spacing.sm,
@@ -524,32 +546,64 @@ const styles = StyleSheet.create({
   appointmentRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
+    paddingVertical: spacing.md,
+    paddingRight: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray100,
+    backgroundColor: colors.white,
+    position: 'relative',
+    overflow: 'hidden',
   },
   lastRow: {
     borderBottomWidth: 0,
   },
-  listAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.full,
+  typeIndicator: {
+    width: 4,
+    height: '100%',
+    marginRight: spacing.md,
   },
   listContent: {
-    marginLeft: spacing.sm,
     flex: 1,
+    justifyContent: 'center',
   },
   listTitle: {
     ...typography.bodyBold,
     color: colors.text,
+    fontSize: 15,
+    marginBottom: 4,
   },
-  listSubtitle: {
-    ...typography.bodySm,
-    color: colors.gray500,
+  typeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    alignSelf: 'flex-start',
+  },
+  typeBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   listRight: {
     alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  timeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.gray100,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radius.md,
+  },
+  listTime: {
+    ...typography.captionBold,
+    color: colors.gray600,
+  },
+  encounterIdText: {
+    fontSize: 11,
+    color: colors.gray500,
+    marginLeft: 8,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
 
   // AI Card

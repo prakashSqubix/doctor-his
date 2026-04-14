@@ -54,6 +54,22 @@ export const aiAPI = {
       throw error;
     }
   },
+  
+  // Delete Audio Session
+  deleteSession: async (sessionId) => {
+    try {
+      const response = await aiAxiosInstance.delete(`/audio/session/${sessionId}`, {
+        data: {
+          sessionId,
+          status: 'deleted'
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('AI Delete Session Error:', error);
+      throw error;
+    }
+  },
 };
 
 export default aiAPI;

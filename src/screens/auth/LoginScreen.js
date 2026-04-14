@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSelector, useDispatch } from 'react-redux';
-import { loginStart, clearError } from '../../store/slices/authSlice';
+import { loginStart, clearError, clearLoginFlow } from '../../store/slices/authSlice';
 
 
 import { TextInput, Button } from '../../components';
@@ -64,8 +64,10 @@ export default function LoginScreen() {
   const { showToast } = useToast();
   const dispatch = useDispatch();
 
-  const [email, setEmail] = useState('rajesh.khuntia@squbix.com');
-  const [password, setPassword] = useState('12345678');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  // const [email, setEmail] = useState('rajesh.khuntia@squbix.com');
+  // const [password, setPassword] = useState('12345678');
   // const [email, setEmail] = useState('deepak.senapati@squbix.com');
   // const [password, setPassword] = useState('99999999');
   const [errors, setErrors] = useState({});
@@ -100,7 +102,8 @@ export default function LoginScreen() {
   }, [activeIndex]);
 
   useEffect(() => {
-    dispatch(loginStart()); // Clear error and loading state on mount
+    // Clear any stuck loading states but preserve errors so session expiry messages can show
+    dispatch(clearLoginFlow()); 
   }, []);
 
   useEffect(() => {

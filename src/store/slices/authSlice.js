@@ -33,12 +33,12 @@ const authSlice = createSlice({
       state.loading = false;
       state.error = action.payload;
     },
-    logout: (state) => {
+    logout: (state, action) => {
       state.isAuthenticated = false;
       state.user = null;
       state.tokens = { accessToken: null, refreshToken: null };
       state.loading = false;
-      state.error = null;
+      state.error = action.payload || null;
     },
     clearError: (state) => {
       state.error = null;

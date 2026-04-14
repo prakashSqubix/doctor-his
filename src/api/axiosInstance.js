@@ -102,7 +102,7 @@ axiosInstance.interceptors.response.use(
         const { store: reduxStore } = require('../store/store');
         const { logout: logoutAction } = require('../store/slices/authSlice');
         
-        reduxStore.dispatch(logoutAction());
+        reduxStore.dispatch(logoutAction('Session expired. Please log in again.'));
         return Promise.reject(error);
       }
       
@@ -111,7 +111,7 @@ axiosInstance.interceptors.response.use(
         console.error('[Auth] 401 still occurring after retry. Logging out.');
         const { store: reduxStore } = require('../store/store');
         const { logout: logoutAction } = require('../store/slices/authSlice');
-        reduxStore.dispatch(logoutAction());
+        reduxStore.dispatch(logoutAction('Session expired. Please log in again.'));
         return Promise.reject(error);
       }
 
@@ -186,7 +186,7 @@ axiosInstance.interceptors.response.use(
         // Trigger global logout to refresh UI and navigate to login
         const { store: reduxStore } = require('../store/store');
         const { logout: logoutAction } = require('../store/slices/authSlice');
-        reduxStore.dispatch(logoutAction());
+        reduxStore.dispatch(logoutAction('Session expired. Please log in again.'));
         
       } finally {
         isRefreshing = false;

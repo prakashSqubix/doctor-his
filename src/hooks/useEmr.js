@@ -69,6 +69,20 @@ export const useAiChunkTranscriptionMutation = () => {
   });
 };
 
+// AI Delete Session mutation
+export const useDeleteAiSessionMutation = () => {
+  return useMutation({
+    mutationFn: async (sessionId) => {
+      const response = await aiAPI.deleteSession(sessionId);
+      console.log('AI Delete Session Response:', response);
+      return response;
+    },
+    onError: (error) => {
+      console.error('AI Delete Session Error:', error);
+    },
+  });
+};
+
 // Fetch EMR Data query
 export const useEmrDataQuery = (params) => {
   return useQuery({
