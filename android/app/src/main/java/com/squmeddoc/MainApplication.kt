@@ -1,4 +1,4 @@
-package com.doctorhis
+package com.squmeddoc
 
 import android.app.Application
 import com.facebook.react.PackageList

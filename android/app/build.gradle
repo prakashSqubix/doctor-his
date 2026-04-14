@@ -78,9 +78,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.doctorhis"
+    namespace "com.squmeddoc"
     defaultConfig {
-        applicationId "com.doctorhis"
+        applicationId "com.squmeddoc"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

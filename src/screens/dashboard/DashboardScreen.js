@@ -131,6 +131,7 @@ const DashboardScreen = () => {
       { text: "Cancel", style: "cancel" },
     ]);
   };
+console.log('data?.data?.find(item => item.cardId === ',data?.data?.find(item => item?.cardId === '692ffd5e1f88a2e6cbf460c1'));
 
 
   return (
@@ -201,7 +202,7 @@ const DashboardScreen = () => {
               </View>
               <View style={styles.statInfo}>
                 <Text style={styles.statLabel}>Check-In</Text>
-                <Text style={styles.statValue}>{data?.data?.find(item => item.cardId === '69301ed71f88a2e6cbf460c7')?.data?.[0]?.count}</Text>
+                <Text style={styles.statValue}>{data?.data?.find(item => item.cardId === '692ffd5e1f88a2e6cbf460c1')?.data?.[0]?.count}</Text>
               </View>
             </View>
           </TouchableOpacity>
@@ -234,7 +235,7 @@ const DashboardScreen = () => {
               </View>
               <View style={styles.statInfo}>
                 <Text style={styles.statLabel}>Pending</Text>
-                <Text style={[styles.statValue, { color: colors.warning }]}>{stats.pending}</Text>
+                <Text style={[styles.statValue, { color: colors.warning }]}>{data?.data?.find(item => item?.cardId === '692ffd5e1f88a2e6cbf460c1')?.data?.[0]?.count}</Text>
               </View>
             </View>
           </TouchableOpacity>
@@ -313,7 +314,7 @@ const DashboardScreen = () => {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { marginBottom: spacing.sm }]}>Quick Actions</Text>
           <View style={styles.statsRow}>
-            <TouchableOpacity onPress={()=>navigation.navigate(RouterConstants.EmrGenerationScreen)} style={[styles.statCard, shadows.sm]}>
+            <TouchableOpacity onPress={()=>navigation.navigate(RouterConstants.AppointmentScreen)} style={[styles.statCard, shadows.sm]}>
               <View style={styles.centerContent}>
                 <View style={[styles.largeIconCircle, styles.bgPrimaryLight]}>
                   <FileText size={24} color={colors.primary} />

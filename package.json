@@ -1,5 +1,5 @@
 {
-  "name": "DoctorHIS",
+  "name": "squmeddoc",
   "version": "0.0.1",
   "private": true,
   "scripts": {
@@ -9,7 +9,10 @@
     "start": "react-native start",
     "test": "jest",
     "tron": "adb reverse tcp:9090 tcp:9090",
-    "apk-build": "cd android && ./gradlew clean && rm -rf .gradle && ./gradlew assembleRelease"
+    "apk-build": "cd android && ./gradlew clean && rm -rf .gradle && ./gradlew assembleRelease",
+    "clean:android": "cd android && ./gradlew clean",
+    "clean:ios": "cd ios && rm -rf build && xcodebuild clean && pod install",
+    "clean": "npm run clean:android && npm run clean:ios"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
