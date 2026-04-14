@@ -4,13 +4,11 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  Image,
   TextInput,
   StyleSheet,
   RefreshControl,
   Platform
 } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
 
 // Import your theme file
 import {
@@ -18,7 +16,6 @@ import {
   spacing,
   typography,
   radius,
-  shadows,
 } from '../../Constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -27,18 +24,15 @@ import {
   Calendar,
   Clock,
   MapPin,
-  CheckCircle,
-  CalendarClock,
-  XCircle,
   Filter,
   Search,
-  ChevronDown,
 } from 'lucide-react-native';
 import { useVisitCompleteMutation, useVisitListQuery } from '../../hooks/useEmr';
 import CheckInModal from './components/CheckInModal';
 import RouterConstants from '../../Constants/RouterConstants';
 import { useNavigation } from '@react-navigation/native';
 import EmptyState from './components/EmptyState';
+import DateRangeFilter from '../../components/DateRangeFilter';
 const AppointmentsScreen = () => {
   const navigation = useNavigation()
   const [visible, setVisible] = useState(false);
@@ -48,33 +42,14 @@ const AppointmentsScreen = () => {
   // Date Filter State
   const [dateFilter, setDateFilter] = useState('TODAY'); // TODAY, YESTERDAY, TOMORROW, CUSTOM
   const [customDateRange, setCustomDateRange] = useState({ start: '', end: '' }); // YYYY-MM-DD
-  const [showCustomDateModal, setShowCustomDateModal] = useState(false);
-  const [tempDateRange, setTempDateRange] = useState({ start: '', end: '' });
-  
-  // DateTimePicker State
-  const [showPicker, setShowPicker] = useState({ show: false, mode: 'date', type: 'start' });
-
-  // Helper to get formatted date string YYYY-MM-DD
   const formatDate = (date) => {
-    return date.toISOString().split('T')[0];
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
-  const onDateChange = (event, selectedDate) => {
-    const currentDate = selectedDate;
-    
-    // Close picker on Android immediately
-    if (Platform.OS === 'android') {
-        setShowPicker({ ...showPicker, show: false });
-    }
-    
-    if (currentDate) {
-        if(showPicker.type === 'start') {
-             setTempDateRange(prev => ({ ...prev, start: formatDate(currentDate) }));
-        } else {
-             setTempDateRange(prev => ({ ...prev, end: formatDate(currentDate) }));
-        }
-    }
-  };
+
 
   // Calculate Date Range based on filter
   const getDateRange = useCallback(() => {
@@ -114,28 +89,7 @@ const AppointmentsScreen = () => {
     to: toDate,
   });
 
-  const handleCustomDateSubmit = () => {
-    // Basic validation
-    if (tempDateRange.start && tempDateRange.end) {
-        if (new Date(tempDateRange.start) > new Date(tempDateRange.end)) {
-            // This should be prevented by picker constraints, but safety check:
-             return; 
-        }
-        setCustomDateRange(tempDateRange);
-        setDateFilter('CUSTOM');
-        setShowCustomDateModal(false);
-    } else {
-        // Fallback or alert if needed
-        if(tempDateRange.start) {
-             setCustomDateRange({start: tempDateRange.start, end: tempDateRange.start});
-             setDateFilter('CUSTOM');
-             setShowCustomDateModal(false);
-        } else {
-            setDateFilter('TODAY');
-            setShowCustomDateModal(false);
-        }
-    }
-  };
+
 
   const {mutate,data:confirmationRes ,isLoading:confirmationLoading ,error:confirmationError,  } = useVisitCompleteMutation()
  
@@ -270,28 +224,18 @@ const AppointmentsScreen = () => {
       {/* Date Filters */}
       {showFilters && (
         <View style={styles.filtersContainer}>
-             <View style={{flexDirection:'row', marginBottom: 12}}>
-                 {['TODAY', 'TOMORROW', 'YESTERDAY', 'CUSTOM'].map((filter) => (
-                    <TouchableOpacity
-                        key={filter}
-                        style={[
-                            styles.filterChip,
-                            dateFilter === filter ? styles.filterChipActive : styles.filterChipInactive
-                        ]}
-                        onPress={() => {
-                            if (filter === 'CUSTOM') {
-                                setShowCustomDateModal(true);
-                            } else {
-                                setDateFilter(filter);
-                            }
-                        }}
-                    >
-                        <Text style={dateFilter === filter ? styles.filterTextActive : styles.filterTextInactive}>
-                            {filter.charAt(0) + filter.slice(1).toLowerCase()}
-                        </Text>
-                    </TouchableOpacity>
-                 ))}
-             </View>
+             <DateRangeFilter
+                initialFilterType={dateFilter.toLowerCase()}
+                initialFromDate={new Date(customDateRange.start || getDateRange().from)}
+                initialToDate={new Date(customDateRange.end || getDateRange().to)}
+                allowedFilters={['today', 'tomorrow', 'yesterday', 'custom']}
+                onApply={(start, end, filterType) => {
+                    setDateFilter(filterType.toUpperCase());
+                    if (filterType === 'custom') {
+                        setCustomDateRange({ start: formatDate(start), end: formatDate(end) });
+                    }
+                }}
+             />
           {/* <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <TouchableOpacity
               style={[
@@ -472,76 +416,7 @@ const AppointmentsScreen = () => {
           ))
         )}
       </ScrollView>
-      {showCustomDateModal && (
-  <View style={styles.modalOverlay}>
-    <View style={styles.dateModal}>
-      <Text style={styles.modalTitle}>Select Date Range</Text>
 
-      {/* DateTimePicker inside modal */}
-      {showPicker.show && (
-        <DateTimePicker
-          value={
-            new Date(
-              showPicker.type === 'start'
-                ? tempDateRange.start || new Date()
-                : tempDateRange.end || new Date()
-            )
-          }
-          mode="date"
-          display={Platform.OS === "ios" ? "spinner" : "default"}
-          onChange={onDateChange}
-          minimumDate={
-            showPicker.type === 'end' && tempDateRange.start
-              ? new Date(tempDateRange.start)
-              : undefined
-          }
-          maximumDate={
-            showPicker.type === 'start' && tempDateRange.end
-              ? new Date(tempDateRange.end)
-              : undefined
-          }
-          style={{ height: Platform.OS === 'ios' ? 220 : undefined }}
-        />
-      )}
-
-      <Text style={styles.modalLabel}>Start Date</Text>
-      <TouchableOpacity
-        style={styles.datePickerButton}
-        onPress={() =>
-          setShowPicker({ show: true, mode: 'date', type: 'start' })
-        }
-      >
-        <Text style={styles.datePickerText}>
-          {tempDateRange.start || 'Select Start Date'}
-        </Text>
-        <Calendar size={20} color={colors.gray500} />
-      </TouchableOpacity>
-
-      <Text style={styles.modalLabel}>End Date</Text>
-      <TouchableOpacity
-        style={styles.datePickerButton}
-        onPress={() =>
-          setShowPicker({ show: true, mode: 'date', type: 'end' })
-        }
-      >
-        <Text style={styles.datePickerText}>
-          {tempDateRange.end || 'Select End Date'}
-        </Text>
-        <Calendar size={20} color={colors.gray500} />
-      </TouchableOpacity>
-
-      <View style={styles.modalActions}>
-        <TouchableOpacity onPress={() => setShowCustomDateModal(false)}>
-          <Text style={styles.modalCancelText}>Cancel</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={handleCustomDateSubmit} style={styles.modalConfirm}>
-          <Text style={styles.modalConfirmText}>Apply</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  </View>
-)}
 
     </View>
   );

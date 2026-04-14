@@ -28,7 +28,7 @@ import {
 } from 'react-native-permissions';
 import RNFS from 'react-native-fs';
 
-import { useAiTranscriptionMutation, useSaveEmrDataMutation, useVisitCompleteMutation, useEmrDataQuery, useUnsignEmrMutation, useUpdateVisitStatusMutation } from '../../hooks/useEmr';
+import { useAiTranscriptionMutation, useAiChunkTranscriptionMutation, useSaveEmrDataMutation, useVisitCompleteMutation, useEmrDataQuery, useUnsignEmrMutation, useUpdateVisitStatusMutation } from '../../hooks/useEmr';
 import { AI_API_CONFIG } from '../../api/aiApi';
 import { 
   Mic, MicOff, ChevronLeft, Trash2, Activity, Edit3, CheckCircle, Clock, FileText,
@@ -90,9 +90,28 @@ const EMRGenerationScreen = () => {
   const [audioData, setAudioData] = useState({ data: '', isRecording: false });
   const [selectedEndpoint, setSelectedEndpoint] = useState(AI_API_CONFIG.ENDPOINTS.TRANSCRIPTION);
   const aiTranscriptionMutation = useAiTranscriptionMutation();
+  const aiChunkTranscriptionMutation = useAiChunkTranscriptionMutation();
+  const [sessionId, setSessionId] = useState(null);
+  const chunkTimerRef = useRef(null);
+  const uiTimerRef = useRef(null);
+  const isRecordingActive = useRef(false);
+  const isChunking = useRef(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [pendingAiResult, setPendingAiResult] = useState(null);
+  const [showRecordingSheet, setShowRecordingSheet] = useState(false);
   // --- Animation State ---
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
+  const micPulseAnim = useRef(new Animated.Value(1)).current;
+  const waveformAnims = useRef([
+    new Animated.Value(0),
+    new Animated.Value(0),
+    new Animated.Value(0),
+    new Animated.Value(0),
+    new Animated.Value(0),
+  ]).current;
+  
+  const audioPath = `${RNFS.CachesDirectoryPath}/recording.aac`;
   
   // --- Core States ---
   const [isRecording, setIsRecording] = useState(false);
@@ -222,6 +241,67 @@ const EMRGenerationScreen = () => {
 
   const rotateInterpolate = rotateAnim.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
   const animatedStyle = { transform: [{ rotate: rotateInterpolate }] }
+
+  // --- New Recording/Processing Animation Loops ---
+  useEffect(() => {
+    let pulseAnimation;
+    if (isRecording) {
+      pulseAnimation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(micPulseAnim, { toValue: 1.3, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          Animated.timing(micPulseAnim, { toValue: 1, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        ])
+      );
+      pulseAnimation.start();
+    } else {
+      micPulseAnim.setValue(1);
+    }
+    return () => pulseAnimation?.stop();
+  }, [isRecording]);
+
+  useEffect(() => {
+    let waveformAnimations = [];
+    if (isProcessing || apiIsLoading) {
+      waveformAnims.forEach((anim, i) => {
+        const a = Animated.loop(
+          Animated.sequence([
+            Animated.timing(anim, { toValue: 1, duration: 300 + (i % 3) * 150, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+            Animated.timing(anim, { toValue: 0.3, duration: 300 + (i % 3) * 150, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          ])
+        );
+        a.start();
+        waveformAnimations.push(a);
+      });
+    } else {
+      waveformAnims.forEach(anim => anim.setValue(0));
+    }
+    return () => waveformAnimations.forEach(a => a.stop());
+  }, [isProcessing, apiIsLoading]);
+
+  const renderVoiceSearchLoader = () => {
+    const barColors = ['#6366F1', '#8B5CF6', '#EC4899', '#F43F5E', '#F97316'];
+    return (
+      <View style={styles.voiceSearchContainer}>
+        {waveformAnims.map((anim, i) => (
+          <Animated.View
+            key={i}
+            style={[
+              styles.waveformBar,
+              {
+                backgroundColor: barColors[i],
+                transform: [{
+                  scaleY: anim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.3, 1]
+                  })
+                }]
+              }
+            ]}
+          />
+        ))}
+      </View>
+    );
+  };
   // --- End Animation Setup ---
 
 
@@ -288,78 +368,146 @@ const EMRGenerationScreen = () => {
     }
   }, []);
 
-  const startRecording = useCallback(async () => {
+  const startRecording = useCallback(async (sid) => {
     const hasPermission = await checkPermissions();
     if (!hasPermission) {
       showToast("Microphone access is required for recording.", "warning");
-
       return;
     }
 
     try {
-      // Setup Sound recorder options
-      Sound.setCategory('Record');
-      Sound.setRecordingOptions({
-        SampleRate: 44100,
-        Channels: 1,
-        AudioQuality: 'High',
-        AudioEncoding: 'aac',
-      });
+      const audioSets = {
+        AudioSamplingRate: 44100,
+        AudioChannels: 1,
+        AudioQuality: 'high',
+      };
       
-      // Note: In a real app, you would check if the recorder is ready before starting
-      await Sound.startRecorder(audioPath); 
+      await Sound.startRecorder(audioPath, audioSets); 
+      isRecordingActive.current = true;
       setIsRecording(true);
-      setTranscript('Listening... Speak clearly. Tap the mic to stop.');
-    } catch (error) {
-      showToast(`Failed to start recording: ${error.message}`, "error");
+      setTranscript('Listening...');
+      
+      // Start UI timer
+      setRecordingSeconds(0);
+      if (uiTimerRef.current) clearInterval(uiTimerRef.current);
+      uiTimerRef.current = setInterval(() => {
+        setRecordingSeconds(prev => prev + 1);
+      }, 1000);
 
+      if (sid) startChunkTimer(sid);
+    } catch (error) {
+      console.log('error.message',error.message)
+      showToast(`Failed to start recording: ${error.message}`, "error");
       setIsRecording(false);
     }
-  }, [checkPermissions]);
+  }, [checkPermissions, startChunkTimer, audioPath]);
+  const startChunkTimer = useCallback((sid) => {
+    if (chunkTimerRef.current) clearInterval(chunkTimerRef.current);
+    
+    chunkTimerRef.current = setInterval(async () => {
+      try {
+        if (!isRecordingActive.current || isChunking.current) return;
+        
+        console.log('Sending 20s chunk...');
+        isChunking.current = true;
+        
+        // Temporarily unset active to avoid race with stopRecording
+        isRecordingActive.current = false;
+        
+        const filePath = await Sound.stopRecorder();
+        const base64Audio = await RNFS.readFile(filePath, 'base64');
+        
+        // Start next recording immediately to minimize gap
+        const audioSets = {
+          AudioSamplingRate: 44100,
+          AudioChannels: 1,
+          AudioQuality: 'high',
+        };
+        await Sound.startRecorder(audioPath, audioSets);
+        isRecordingActive.current = true;
+        isChunking.current = false;
+        
+        const response = await aiChunkTranscriptionMutation.mutateAsync({
+          sessionId: sid,
+          isFinal: false,
+          audioBase64: base64Audio,
+        });
+
+        if (response?.transcription) {
+          setTranscript(response.transcription);
+        }
+      } catch (error) {
+        console.error('Error sending chunk:', error);
+        isChunking.current = false;
+      }
+    }, 20000); // 20 seconds
+  }, [aiChunkTranscriptionMutation]);
+
   const stopRecording = async () => {
     try {
-      const filePath = await Sound.stopRecorder();
+      // Clear timers
+      if (chunkTimerRef.current) {
+        clearInterval(chunkTimerRef.current);
+        chunkTimerRef.current = null;
+      }
+      if (uiTimerRef.current) {
+        clearInterval(uiTimerRef.current);
+        uiTimerRef.current = null;
+      }
+
+      // Wait if a chunk is currently being processed
+      let waitCount = 0;
+      while (isChunking.current && waitCount < 10) {
+        await new Promise(r => setTimeout(r, 100));
+        waitCount++;
+      }
+
+      const wasActive = isRecordingActive.current;
+      isRecordingActive.current = false;
+      
+      let filePath = null;
+      if (wasActive) {
+        filePath = await Sound.stopRecorder();
+      } else {
+        console.log('Recorder not active on stop, possibly just chunked.');
+        // We still need to send the final request
+      }
+
       Sound.removeRecordBackListener();
       
-      setLastRecordingPath(filePath);
+      if (filePath) setLastRecordingPath(filePath);
       setHasProcessingError(false);
       
       // START PROCESSING
       setIsProcessing(true); 
       setAudioData(prev => ({ ...prev, isRecording: false }));
+      setIsRecording(false);
       setTranscript('Audio recorded. Analyzing consultation...'); 
       
-      const base64Audio = await RNFS.readFile(filePath, 'base64');
+      const fileExists = filePath ? await RNFS.exists(filePath) : false;
+      let base64Audio = null;
+      if (fileExists) {
+        base64Audio = await RNFS.readFile(filePath, 'base64');
+      }
   
       try {
-        const aiResult = await aiTranscriptionMutation.mutateAsync({ 
-          base64AudioString: base64Audio, 
-          endpoint: selectedEndpoint 
+        const aiResult = await aiChunkTranscriptionMutation.mutateAsync({ 
+          sessionId: sessionId,
+          isFinal: true,
+          audioBase64: base64Audio 
         });
         
         if (aiResult) {
-          setTranscript(aiResult.transcription || '');
-          setStructuredData({
-            pharmacy: aiResult?.pharmacy || [],
-            allergies: aiResult.allergies || [],
-            chiefComplaint: aiResult.chiefComplaint || [],
-            diagnosis: aiResult.diagnosis || [],
-            service: aiResult.service || [],
-          });
-
-          setFormText({
-            patientHistory: aiResult?.patientHistory ,
-            familyHistory: aiResult?.familyHistory,
-            surgicalHistory: aiResult?.surgicalHistory,
-            instructions: aiResult?.instructions?.map(i => i.generalInstructions).join('\n') || '',
-            summary: aiResult?.summary,
-          });
+          setTranscript(aiResult.fullTranscript || aiResult.transcription || '');
+          setPendingAiResult(aiResult);
           
-          showToast("EMR fields populated.", "success");
-          // On success, we can safely delete the file
-          const fileExists = await RNFS.exists(filePath);
-          if (fileExists) await RNFS.unlink(filePath);
+          // Clean up
+          if (filePath) {
+            const fileExists = await RNFS.exists(filePath);
+            if (fileExists) await RNFS.unlink(filePath);
+          }
           setLastRecordingPath(null);
+          setSessionId(null);
         }
       } catch (aiError) {
         console.error(aiError);
@@ -373,6 +521,37 @@ const EMRGenerationScreen = () => {
       setIsProcessing(false);
       setHasProcessingError(true);
     }
+  };
+
+  const handleApplyAiResult = () => {
+    if (!pendingAiResult) return;
+    
+    setStructuredData({
+      pharmacy: pendingAiResult?.pharmacy || [],
+      allergies: pendingAiResult.allergies || [],
+      chiefComplaint: pendingAiResult.chiefComplaint || [],
+      diagnosis: pendingAiResult.diagnosis || [],
+      service: pendingAiResult.service || [],
+      vitals: structuredData.vitals, // Keep existing vitals
+    });
+
+    setFormText({
+      patientHistory: pendingAiResult?.patientHistory || '',
+      familyHistory: pendingAiResult?.familyHistory || '',
+      surgicalHistory: pendingAiResult?.surgicalHistory || '',
+      instructions: pendingAiResult?.instructions?.map(i => i.generalInstructions).join('\n') || pendingAiResult?.instructions || '',
+      summary: pendingAiResult?.summary || '',
+    });
+    
+    showToast("EMR fields populated.", "success");
+    setPendingAiResult(null);
+    setShowRecordingSheet(false);
+  };
+
+  const handleDiscardAiResult = () => {
+    setPendingAiResult(null);
+    setShowRecordingSheet(false);
+    showToast("AI results discarded.", "info");
   };
 
   const handleRetryTranscription = async () => {
@@ -472,7 +651,7 @@ const EMRGenerationScreen = () => {
   }, []);
 
   const handleRecordAudio = async () => {
-    // ... Permission logic same as before ...
+    // Check permissions
     let permissionsGranted = false;
     try {
         const permission = Platform.OS === 'android' ? PERMISSIONS.ANDROID.RECORD_AUDIO : PERMISSIONS.IOS.MICROPHONE;
@@ -483,33 +662,19 @@ const EMRGenerationScreen = () => {
     if(permissionsGranted) {
         if (audioData.isRecording) {
             await stopRecording();
+        } else if (!showRecordingSheet) {
+            // Only open the sheet, let the user start recording manually inside
+            setShowRecordingSheet(true);
+            setTranscript('');
+            setPendingAiResult(null);
+            setHasProcessingError(false);
+            setRecordingSeconds(0);
         } else {
-            Alert.alert(
-              "Select Language",
-              "Which language option would you like to use?",
-              [
-                {
-                  text: "English Only",
-                  onPress: async () => {
-                    setSelectedEndpoint(AI_API_CONFIG.ENDPOINTS.TRANSCRIPTION);
-                    setAudioData({ ...audioData, isRecording: true });
-                    await Sound.startRecorder();
-                  }
-                },
-                {
-                  text: "Multi-language (Odia/English)",
-                  onPress: async () => {
-                    setSelectedEndpoint(AI_API_CONFIG.ENDPOINTS.TRANSCRIPTION_MULTI);
-                    setAudioData({ ...audioData, isRecording: true });
-                    await Sound.startRecorder();
-                  }
-                },
-                {
-                  text: "Cancel",
-                  style: "cancel"
-                }
-              ]
-            );
+            // Handle starting recording from within the modal
+            const sid = `sess_${Math.random().toString(36).substring(2, 15)}`;
+            setSessionId(sid);
+            setAudioData({ ...audioData, isRecording: true });
+            await startRecording(sid);
         }
     }
   };
@@ -865,7 +1030,227 @@ const EMRGenerationScreen = () => {
     );
   };
   
-  const ActionModalWrapper = () => {
+  const renderResultsView = (result) => {
+    if (!result) return null;
+    
+    // Normalization logic
+    const data = result.data || result;
+    const diagnosisCount = Array.isArray(data.diagnosis) ? data.diagnosis.length : 0;
+    const medsCount = Array.isArray(data.pharmacy) ? data.pharmacy.length : (Array.isArray(data.medications) ? data.medications.length : 0);
+    const symptomsCount = Array.isArray(data.chiefComplaint) ? data.chiefComplaint.length : 0;
+    const summary = data.summary || data.clinicalSummary || data.patientHistory || '';
+    const transcript = data.fullTranscript || data.transcription || data.full_transcript || '';
+
+    return (
+      <View style={{ width: '100%', height: height * 0.8, backgroundColor: colors.white }}>
+        <View style={styles.confirmHeader}>
+          <View style={styles.aiIconBadge}>
+            <Zap size={24} color={colors.white} />
+          </View>
+          <View style={{ flex: 1, marginLeft: 16 }}>
+            <Text style={styles.confirmTitle}>AI Assistant Summary</Text>
+            <Text style={styles.confirmSubtitle}>Review clinical findings below</Text>
+          </View>
+        </View>
+        
+        <ScrollView 
+          style={{  }} 
+          contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+          showsVerticalScrollIndicator={true}
+        >
+          <View style={styles.findingsGrid}>
+            <View style={styles.findingCard}>
+              <CheckCircle size={20} color={colors.green600} />
+              <Text style={styles.findingValue}>{diagnosisCount}</Text>
+              <Text style={styles.findingLabel}>Diagnosis</Text>
+            </View>
+            <View style={styles.findingCard}>
+              <Activity size={20} color={colors.primary} />
+              <Text style={styles.findingValue}>{medsCount}</Text>
+              <Text style={styles.findingLabel}>Meds</Text>
+            </View>
+            <View style={[styles.findingCard, { marginRight: 0 }]}>
+              <Zap size={20} color={colors.red500} />
+              <Text style={styles.findingValue}>{symptomsCount}</Text>
+              <Text style={styles.findingLabel}>Symptoms</Text>
+            </View>
+          </View>
+
+          {summary ? (
+            <View style={styles.summarySection}>
+              <View style={styles.summaryHeader}>
+                <FileText size={16} color={colors.primary} style={{ marginRight: 6 }} />
+                <Text style={styles.summaryTitle}>Clinical Summary</Text>
+              </View>
+              <Text style={styles.summaryText}>{summary}</Text>
+            </View>
+          ) : (
+            <View style={[styles.summarySection, { padding: 15, alignItems: 'center', backgroundColor: '#F8FAFC' }]}>
+               <Text style={[styles.summaryText, { fontStyle: 'italic', opacity: 0.7 }]}>No clinical summary extracted from this clip.</Text>
+            </View>
+          )}
+
+          {transcript ? (
+            <View style={[styles.summarySection, { backgroundColor: '#F0F9FF', marginTop: 10 }]}>
+               <View style={styles.summaryHeader}>
+                <Mic size={16} color={colors.primary} style={{ marginRight: 6 }} />
+                <Text style={[styles.summaryTitle, { color: colors.primary }]}>Transcription</Text>
+              </View>
+              <Text style={styles.summaryText}>{transcript}</Text>
+            </View>
+          ) : (
+             <View style={{ padding: 20, alignItems: 'center' }}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={{ marginTop: 8, fontSize: 12, color: colors.gray500 }}>Waiting for transcription data...</Text>
+             </View>
+          )}
+
+          <View style={{ height: 40 }} /> 
+        </ScrollView>
+        
+        <View style={[styles.confirmActions, { 
+          position: 'absolute', 
+          bottom: 0, 
+          left: 0, 
+          right: 0, 
+          paddingHorizontal: 20, 
+          paddingTop: 12, 
+          paddingBottom: insets.bottom + 12, 
+          backgroundColor: colors.white, 
+          borderTopWidth: 1, 
+          borderTopColor: colors.gray100,
+          ...shadows.lg
+        }]}>
+          <TouchableOpacity style={styles.discardBtn} onPress={handleDiscardAiResult}>
+            <Text style={styles.discardBtnText}>Discard</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.applyBtn} onPress={handleApplyAiResult}>
+            <Zap size={18} color={colors.white} style={{ marginRight: 8 }} />
+            <Text style={styles.applyBtnText}>Apply to EMR</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  const renderRecordingView = () => (
+    <View style={styles.recordingSheetContent}>
+      <Text style={styles.recordingSheetTitle}>
+        {isProcessing ? 'Analyzing Consultation' : 'Consultation Assistant'}
+      </Text>
+      
+       <View style={styles.recordingVisualContainer}>
+         <Animated.View style={[
+           styles.micRing, 
+           (audioData?.isRecording || isProcessing) && styles.micRingActive, 
+           { 
+             padding: 15,
+             transform: [{ scale: micPulseAnim }],
+             opacity: isRecording ? micPulseAnim.interpolate({ inputRange: [1, 1.3], outputRange: [1, 0.6] }) : 1
+           }
+         ]}>
+            <TouchableOpacity 
+              style={[styles.micButton, (audioData?.isRecording || isProcessing) && styles.micButtonRecording, { width: 80, height: 80, borderRadius: 40 }]}
+              onPress={handleRecordAudio}
+              disabled={isProcessing || apiIsLoading} 
+              activeOpacity={0.7}
+            >
+              {isProcessing ? (
+                <ActivityIndicator size="large" color={colors.white} />
+              ) : audioData?.isRecording ? (
+                <MicOff size={32} color={colors.white} />
+              ) : (
+                <Mic size={32} color={colors.white} />
+              )}
+            </TouchableOpacity>
+          </Animated.View>
+          
+          {isRecording && (
+             <Text style={styles.recordingTimerText}>
+                {Math.floor(recordingSeconds / 60).toString().padStart(2, '0')}:{(recordingSeconds % 60).toString().padStart(2, '0')}
+             </Text>
+          )}
+      </View>
+
+      <View style={styles.recordingStatusContainer}>
+        {(isProcessing || apiIsLoading) ? (
+          <View style={{ alignItems: 'center' }}>
+            {renderVoiceSearchLoader()}
+            <Text style={styles.processingText}>Analyzing consultation content...</Text>
+            <Text style={styles.processingSubText}>Extracting medical findings and patient history</Text>
+          </View>
+        ) : hasProcessingError ? (
+          <View style={{ alignItems: 'center' }}>
+            <X size={24} color={colors.red500} style={{ marginBottom: 8 }} />
+            <Text style={[styles.processingText, { color: colors.red500 }]}>Analysis Failed</Text>
+            <Text style={styles.processingSubText}>Could not process the recording. Please try again.</Text>
+          </View>
+        ) : (
+          <Text style={styles.recordingHintText}>
+            {isRecording ? 'Listening to your consultation...' : 'Tap the microphone to start recording'}
+          </Text>
+        )}
+        
+        {transcript !== '' && !isProcessing && !hasProcessingError && (
+          <View style={styles.sheetTranscriptBubble}>
+            <Text style={styles.sheetTranscriptText} numberOfLines={3}>
+              {transcript}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {!isProcessing && (
+        <TouchableOpacity 
+          style={styles.closeSheetBtn}
+          onPress={() => {
+            if (isRecording) {
+              stopRecording();
+            } else {
+              setShowRecordingSheet(false);
+            }
+          }}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.closeSheetBtnText}>
+            {isRecording ? 'Stop & Process' : 'Close'}
+          </Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
+  const renderRecordingSheet = () => {
+    if (!showRecordingSheet) return null;
+    return (
+      <Modal
+        animationType="slide"
+        transparent
+        visible={showRecordingSheet}
+        onRequestClose={() => {
+          if (isRecording) stopRecording();
+          setShowRecordingSheet(false);
+        }}
+      >
+        <View style={styles.modalBackdrop}>
+           <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => {
+               if (!isRecording && !isProcessing) setShowRecordingSheet(false);
+            }}
+          />
+          <Pressable style={{ width: '100%', justifyContent: 'flex-end' }} onPress={() => {}}>
+            <View style={[styles.modalSheet, { paddingBottom: insets.bottom + 20 }]}>
+              <View style={styles.confirmModalIndicator} />
+              {pendingAiResult ? renderResultsView(pendingAiResult) : renderRecordingView()}
+            </View>
+          </Pressable>
+        </View>
+      </Modal>
+    );
+  };
+  
+  const renderActionModal = () => {
     if (!modalState) return null;
   
     const { category, mode, index, data } = modalState;
@@ -1259,6 +1644,8 @@ const EMRGenerationScreen = () => {
     </View>
   );
 
+  // 7. AI Confirmation Modal
+
   // --- MAIN RENDER ---
   if (isFetchingEmr) {
     return (
@@ -1301,46 +1688,6 @@ const EMRGenerationScreen = () => {
           keyboardShouldPersistTaps="handled"
         >
           
-          {/* Voice Recorder Section */}
-          <View style={styles.voiceSection}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20 }}>
-              <View style={[styles.micRing, (audioData?.isRecording || isProcessing) && styles.micRingActive]}>
-                <TouchableOpacity 
-                  style={[styles.micButton, (audioData?.isRecording || isProcessing) && styles.micButtonRecording]}
-                  onPress={handleRecordAudio}
-                  disabled={isProcessing || apiIsLoading} 
-                >
-                  {isProcessing ? (
-                    <Loader size={28} color={colors.white} />
-                  ) : audioData?.isRecording ? (
-                    <MicOff size={28} color={colors.white} />
-                  ) : (
-                    <Mic size={28} color={colors.white} />
-                  )}
-                </TouchableOpacity>
-              </View>
-
-              {hasProcessingError && !audioData?.isRecording && !isProcessing && (
-                <TouchableOpacity 
-                  style={styles.retryButton}
-                  onPress={handleRetryTranscription}
-                >
-                  <RotateCcw size={24} color={colors.white} />
-                </TouchableOpacity>
-              )}
-            </View>
-            
-            <Text style={styles.recordingStatusText}>
-              {isProcessing ? 'Processing consultation...' : 
-               audioData?.isRecording ? 'Listening... Tap to stop' : 
-               hasProcessingError ? 'Generation failed' : 'Consultation Voice Assistant'}
-            </Text>
-            {(isProcessing || apiIsLoading) ? renderProcessingView() : (transcript !== '' && (
-              <View style={styles.transcriptBubble}>
-                <Text style={styles.transcriptText} numberOfLines={2}>{transcript}</Text>
-              </View>
-            ))}
-          </View>
 
           {/* Tabs */}
           <View style={styles.tabsContainer}>
@@ -1449,7 +1796,7 @@ const EMRGenerationScreen = () => {
           CRITICAL FIX: This line renders the Modal component which conditionally
           displays the ItemForm when modalState is set (e.g., by clicking "Add New" or a card).
       */}
-      <ActionModalWrapper />
+      {renderActionModal()}
 
       {/* Footer */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
@@ -1518,6 +1865,23 @@ const EMRGenerationScreen = () => {
         )}
       </View>
 
+
+      {/* Floating Action Button for Recording */}
+      {!isFormLocked && !showRecordingSheet && (
+        <TouchableOpacity 
+          style={[styles.fabButton, { bottom: insets.bottom + 100 }]} 
+          onPress={handleRecordAudio}
+          activeOpacity={0.8}
+        >
+          <View style={styles.fabGradient}>
+            <Mic size={28} color={colors.white} />
+          </View>
+        </TouchableOpacity>
+      )}
+
+      {/* Recording Bottom Sheet */}
+      {renderRecordingSheet()}
+
     </View>
   );
 };
@@ -1542,9 +1906,256 @@ const styles = StyleSheet.create({
   transcriptBubble: { marginTop: 12, backgroundColor: colors.white, padding: 12, borderRadius: 12, width: '100%', ...shadows.sm },
   transcriptText: { color: colors.gray800, fontSize: 12, fontStyle: 'italic' },
   
+  // NEW RECORDING SHEET STYLES
+  fabButton: {
+    position: 'absolute',
+    right: 20,
+    width: 65,
+    height: 65,
+    borderRadius: 33,
+    backgroundColor: colors.primary,
+    ...shadows.lg,
+    zIndex: 999,
+  },
+  fabGradient: {
+    flex: 1,
+    borderRadius: 33,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  recordingSheetContent: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  recordingSheetTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.gray900,
+    marginBottom: 30,
+  },
+  recordingVisualContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 30,
+  },
+  recordingTimerText: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.primary,
+    marginTop: 15,
+    fontVariant: ['tabular-nums'],
+  },
+  recordingStatusContainer: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  recordingHintText: {
+    fontSize: 15,
+    color: colors.gray500,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  sheetTranscriptBubble: {
+    marginTop: 20,
+    backgroundColor: '#F8FAFC',
+    padding: 16,
+    borderRadius: 16,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  sheetTranscriptText: {
+    color: colors.gray700,
+    fontSize: 14,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  closeSheetBtn: {
+    width: '100%',
+    paddingVertical: 16,
+    borderRadius: 16,
+    backgroundColor: colors.gray100,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeSheetBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.gray600,
+  },
+  
   processingContainer: { marginTop: 12, alignItems: 'center', padding: 16, borderRadius: 12, backgroundColor: '#E0E7FF', width: '100%' },
-  processingText: { fontSize: 16, fontWeight: '700', color: colors.primaryDark, marginBottom: 4 },
-  processingSubText: { fontSize: 12, color: colors.primary },
+  processingText: { fontSize: 16, fontWeight: '700', color: colors.gray800, marginBottom: 4 },
+  processingSubText: { fontSize: 13, color: colors.gray500, textAlign: 'center' },
+
+  voiceSearchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 60,
+    gap: 8,
+    marginBottom: 15,
+  },
+  waveformBar: {
+    width: 8,
+    height: 40,
+    borderRadius: 4,
+  },
+  
+  confirmModalSheet: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingBottom: 40,
+    maxHeight: '85%',
+    ...shadows.lg,
+  },
+  confirmModalIndicator: {
+    width: 40,
+    height: 4,
+    backgroundColor: colors.gray200,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 12,
+  },
+  confirmHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray100,
+  },
+  aiIconBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.gray900,
+  },
+  confirmSubtitle: {
+    fontSize: 13,
+    color: colors.gray500,
+    marginTop: 2,
+  },
+  closeModalBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.gray100,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmScroll: {
+    padding: 24,
+  },
+  findingsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  findingCard: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  findingValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: colors.gray900,
+    marginTop: 8,
+  },
+  findingLabel: {
+    fontSize: 11,
+    color: colors.gray500,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: 2,
+  },
+  summarySection: {
+    backgroundColor: '#EEF2FF',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 24,
+  },
+  summaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  summaryTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.primaryDark,
+  },
+  summaryText: {
+    fontSize: 14,
+    color: colors.gray700,
+    lineHeight: 20,
+    fontStyle: 'italic',
+  },
+  noteBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+  noteText: {
+    fontSize: 12,
+    color: colors.gray600,
+    flex: 1,
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+    gap: 12,
+  },
+  discardBtn: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 16,
+    backgroundColor: colors.gray100,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  discardBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.gray600,
+  },
+  applyBtn: {
+    flex: 2,
+    paddingVertical: 16,
+    borderRadius: 16,
+    backgroundColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadows.md,
+  },
+  applyBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.white,
+  },
   
   tabsContainer: { marginBottom: 10 },
   tabsContent: { paddingHorizontal: 20, paddingVertical: 10 },

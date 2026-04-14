@@ -279,7 +279,7 @@ const DashboardScreen = () => {
         </View>
 
         {/* Recent EMRs */}
-        <View style={styles.section}>
+        {/* <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent EMRs</Text>
             <TouchableOpacity style={styles.viewAllButton}>
@@ -288,7 +288,6 @@ const DashboardScreen = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Added shadows.sm here */}
           <View style={[styles.cardList, shadows.sm]}>
             {recentEMRs.map((emr, index) => (
               <TouchableOpacity 
@@ -309,13 +308,11 @@ const DashboardScreen = () => {
               </TouchableOpacity>
             ))}
           </View>
-        </View>
+        </View> */}
 
-        {/* Quick Actions */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { marginBottom: spacing.sm }]}>Quick Actions</Text>
           <View style={styles.statsRow}>
-            {/* Added shadows.sm here */}
             <TouchableOpacity onPress={()=>navigation.navigate(RouterConstants.EmrGenerationScreen)} style={[styles.statCard, shadows.sm]}>
               <View style={styles.centerContent}>
                 <View style={[styles.largeIconCircle, styles.bgPrimaryLight]}>
@@ -325,7 +322,6 @@ const DashboardScreen = () => {
               </View>
             </TouchableOpacity>
 
-            {/* Added shadows.sm here */}
             <TouchableOpacity style={[styles.statCard, shadows.sm]}>
               <View style={styles.centerContent}>
                 <View style={[styles.largeIconCircle, styles.bgSuccessLight]}>
@@ -362,7 +358,8 @@ const DashboardScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.gray100, 
+    // backgroundColor: colors.gray100, 
+    backgroundColor: '#F7F7F7', 
   },
   // Header
   header: {

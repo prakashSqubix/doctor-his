@@ -2457,34 +2457,6 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
-  - RNDateTimePicker (8.5.1):
-    - boost
-    - DoubleConversion
-    - fast_float
-    - fmt
-    - glog
-    - hermes-engine
-    - RCT-Folly
-    - RCT-Folly/Fabric
-    - RCTRequired
-    - RCTTypeSafety
-    - React-Core
-    - React-debug
-    - React-Fabric
-    - React-featureflags
-    - React-graphics
-    - React-ImageManager
-    - React-jsi
-    - React-NativeModulesApple
-    - React-RCTFabric
-    - React-renderercss
-    - React-rendererdebug
-    - React-utils
-    - ReactCodegen
-    - ReactCommon/turbomodule/bridging
-    - ReactCommon/turbomodule/core
-    - SocketRocket
-    - Yoga
   - RNFS (2.20.0):
     - React-Core
   - RNGestureHandler (2.29.1):
@@ -2767,7 +2739,6 @@ DEPENDENCIES:
   - ReactCodegen (from `build/generated/ios`)
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
   - "RNCAsyncStorage (from `../node_modules/@react-native-async-storage/async-storage`)"
-  - "RNDateTimePicker (from `../node_modules/@react-native-community/datetimepicker`)"
   - RNFS (from `../node_modules/react-native-fs`)
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
   - RNPermissions (from `../node_modules/react-native-permissions`)
@@ -2933,8 +2904,6 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon"
   RNCAsyncStorage:
     :path: "../node_modules/@react-native-async-storage/async-storage"
-  RNDateTimePicker:
-    :path: "../node_modules/@react-native-community/datetimepicker"
   RNFS:
     :path: "../node_modules/react-native-fs"
   RNGestureHandler:
@@ -3026,7 +2995,6 @@ SPEC CHECKSUMS:
   ReactCodegen: 0936e9ff5fd359d5f6b5173c2a90e91b446d33a3
   ReactCommon: 8df6e27c060970b9fb77a86e69a1cf9b934ea458
   RNCAsyncStorage: 302f2fac014fd450046c120567ca364632da682b
-  RNDateTimePicker: 9d0df1bcce5eabbb670b0b0177fd43d0211bd86a
   RNFS: 4ac0f0ea233904cb798630b3c077808c06931688
   RNGestureHandler: 606b85298c19d681ca076ca523dc23396120adab
   RNPermissions: 8f2fed0a4d504643ca054cb8004ff38b3d03158c

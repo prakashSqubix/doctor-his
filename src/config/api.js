@@ -1,8 +1,8 @@
 // API Configuration
 export const API_CONFIG = {
   // Replace with your actual API URL
-  BASE_URL: 'http://192.168.1.24:5003',
-  // BASE_URL: 'https://api-squbix-his.squbix.com',
+  // BASE_URL: 'http://192.168.1.51:5003',
+  BASE_URL: 'https://api-squbix-his.squbix.com',
 
   
   // API Endpoints
@@ -13,7 +13,7 @@ export const API_CONFIG = {
     SELECT_FACILITY: '/users/select-facility',
     SELECT_ROLE: '/users/select-role',
 
-    REFRESH_TOKEN: '/refresh-token',
+    REFRESH_TOKEN: '/users/refresh',
     LOGOUT: '/logout',
     
     //emr

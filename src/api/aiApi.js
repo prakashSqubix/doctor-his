@@ -6,6 +6,7 @@ export const AI_API_CONFIG = {
   ENDPOINTS: {
     TRANSCRIPTION: '/conversation',
     TRANSCRIPTION_MULTI: '/conversation/od-en',
+    TRANSCRIPTION_CHUNK: '/transcribe/chunk',
   },
   TIMEOUT: 500000, // 30 seconds for AI processing
   HEADERS: {
@@ -32,6 +33,24 @@ export const aiAPI = {
       return response.data;
     } catch (error) {
       console.error('AI Transcription Error:', error);
+      throw error;
+    }
+  },
+
+  // Chunked Transcription
+  transcribeChunk: async ({ sessionId, isFinal, audioBase64 }) => {
+    try {
+      const payload = {
+        sessionId,
+        isFinal,
+      };
+      if (audioBase64) {
+        payload.audioBase64 = audioBase64;
+      }
+      const response = await aiAxiosInstance.post(AI_API_CONFIG.ENDPOINTS.TRANSCRIPTION_CHUNK, payload);
+      return response.data;
+    } catch (error) {
+      console.error('AI Chunk Transcription Error:', error);
       throw error;
     }
   },

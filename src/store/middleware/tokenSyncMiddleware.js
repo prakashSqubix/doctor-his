@@ -7,9 +7,15 @@ const tokenSyncMiddleware = (store) => (next) => (action) => {
   // Sync tokens to AsyncStorage when auth state changes
   if (action.type === 'auth/loginSuccess') {
     const { tokens, user } = action.payload;
-    AsyncStorage.setItem('accessToken', tokens.accessToken).catch(console.error);
-    AsyncStorage.setItem('refreshToken', tokens.refreshToken).catch(console.error);
-    AsyncStorage.setItem('userInfo', JSON.stringify(user)).catch(console.error);
+    if (tokens?.accessToken) {
+      AsyncStorage.setItem('accessToken', tokens.accessToken).catch(console.error);
+    }
+    if (tokens?.refreshToken) {
+      AsyncStorage.setItem('refreshToken', tokens.refreshToken).catch(console.error);
+    }
+    if (user) {
+      AsyncStorage.setItem('userInfo', JSON.stringify(user)).catch(console.error);
+    }
   }
 
   if (action.type === 'auth/logout') {

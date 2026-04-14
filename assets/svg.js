@@ -11,7 +11,7 @@ export const UnselectDashboard = ({ fill = '#000', ...props }) => (
     xmlns="http://www.w3.org/2000/svg"
     {...props}
   >
-    <Path fill="#fff" d="M41.5 24h-24V0h24z" />
+    {/* <Path fill="#fff" d="M41.5 24h-24V0h24z" /> */}
     <Rect
       x={39}
       y={21.5}
@@ -68,7 +68,7 @@ export const SelectDashboard = ({ fill = '#000', ...props }) => (
       width={24}
       height={24}
       transform="matrix(-1 0 0 -1 41.5 24)"
-      fill="white"
+      fill="transparent"
     />
     <Rect
       x={39.5}
@@ -122,7 +122,7 @@ export const SelectDashboard = ({ fill = '#000', ...props }) => (
     xmlns="http://www.w3.org/2000/svg"
     {...props}
   >
-    <Path fill="#fff" d="M26 0h24v24H26z" />
+    {/* <Path fill="#fff" d="M26 0h24v24H26z" /> */}
     <Path
       d="M47.22 14.954V8.19a.37.37 0 0 0-.368-.368H28.407a.37.37 0 0 0-.368.368V18.5c0 .994.808 1.803 1.803 1.803h10.897A4.4 4.4 0 0 0 44.789 23a4.397 4.397 0 0 0 4.392-4.392c0-1.524-.78-2.866-1.96-3.655Zm-17.38 4.613a1.07 1.07 0 0 1-1.065-1.066V8.56h17.709v5.997a4.4 4.4 0 0 0-1.695-.34 4.397 4.397 0 0 0-4.392 4.391c0 .33.04.65.11.96zm14.948 2.695a3.66 3.66 0 0 1-3.655-3.655 3.66 3.66 0 0 1 3.655-3.655 3.66 3.66 0 0 1 3.656 3.655 3.66 3.66 0 0 1-3.656 3.655Z"
       fill="#b3b3b3"
@@ -158,7 +158,7 @@ export const SelectDashboard = ({ fill = '#000', ...props }) => (
     xmlns="http://www.w3.org/2000/svg"
     {...props}
   >
-    <Path fill="#fff" d="M26 0h24v24H26z" />
+    {/* <Path fill="#fff" d="M26 0h24v24H26z" /> */}
     <Path
       d="M44.227 21.33a3.327 3.327 0 0 1-3.323-3.324 3.327 3.327 0 0 1 3.323-3.323 3.327 3.327 0 0 1 3.323 3.323 3.327 3.327 0 0 1-3.323 3.324"
       fill="#06c"

@@ -57,7 +57,15 @@ export const authAPI = {
   // Refresh token
 
   refreshToken: async (refreshToken) => {
-    const response = await axiosInstance.post(API_CONFIG.ENDPOINTS.REFRESH_TOKEN, { refreshToken });
+    const response = await axiosInstance.post(
+      API_CONFIG.ENDPOINTS.REFRESH_TOKEN,
+      {},
+      {
+        headers: {
+          'Cookie': `refreshToken=${refreshToken}`,
+        },
+      }
+    );
     return response.data;
   },
 

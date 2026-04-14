@@ -11,6 +11,7 @@ import DashboardScreen from '../dashboard/DashboardScreen';
 import PatientScreen from '../patient/PatientScreen';
 import ProfileScreen from '../profile/ProfileScreen';
 import PatientHistory from '../emr/PatientHistory';
+import CustomTabBar from '../../components/Navigation/CustomTabBar';
 
 
 import {
@@ -30,33 +31,14 @@ const BottomTabBar = () => {
   
   return (
     <>
-      {Platform.OS === 'android' && (
-        <View
-          style={{
-            position: 'absolute',
-            top: 0, // Adjust the position to be just above the tab bar
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: 10, // Height of the shadow view
-            backgroundColor: colorStrings?.grey, // Shadow color
-            opacity: 1, // Shadow opacity
-          }}
-        />
-      )}
       <Tab.Navigator
+        tabBar={(props) => <CustomTabBar {...props} />}
         backBehavior="none"
         screenOptions={{
           headerShown: false,
           tabBarShowLabel: false,
           tabBarInactiveTintColor: colorStrings.inactiveTextGrey,
           tabBarActiveTintColor: colorStrings.clientColor,
-          tabBarStyle: {
-            backgroundColor: 'white', // Make sure background is set
-            paddingTop: 5,
-            height: 60 + insets.bottom,
-            paddingBottom: insets.bottom,
-          },
         }}
       >
         <Tab.Screen

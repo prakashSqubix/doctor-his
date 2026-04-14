@@ -55,6 +55,20 @@ export const useAiTranscriptionMutation = () => {
   });
 };
 
+// AI Chunked Transcription mutation
+export const useAiChunkTranscriptionMutation = () => {
+  return useMutation({
+    mutationFn: async ({ sessionId, isFinal, audioBase64 }) => {
+      const response = await aiAPI.transcribeChunk({ sessionId, isFinal, audioBase64 });
+      console.log('AI Chunk Transcription Response:', response);
+      return response;
+    },
+    onError: (error) => {
+      console.error('AI Chunk Transcription Error:', error);
+    },
+  });
+};
+
 // Fetch EMR Data query
 export const useEmrDataQuery = (params) => {
   return useQuery({
